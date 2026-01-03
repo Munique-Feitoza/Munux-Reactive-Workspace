@@ -1,0 +1,40 @@
+# Author: Munique Alves Pacheco Feitoza
+# License: GPLv3
+
+[package]
+name = "munux-reactive-workspace"
+version = "0.1.0"
+edition = "2021"
+authors = ["Munique Alves Pacheco Feitoza <munique.feitoza@example.com>"]
+license = "GPL-3.0"
+description = "A next-generation reactive terminal environment for education and productivity"
+repository = "https://github.com/Munique-Feitoza/Munux-Reactive-Workspace"
+keywords = ["terminal", "tui", "education", "gamification", "rust"]
+
+[dependencies]
+# UI & Terminal Handling
+ratatui = "0.26.1"
+crossterm = "0.27.0"
+tui-textarea = "0.4.0"
+
+# System Info (Para o Monitor de CPU/RAM)
+sysinfo = "0.30.5"
+
+# Utilities
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+
+# File system operations
+walkdir = "2.4"
+
+[dev-dependencies]
+# Testing
+criterion = "0.5"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
