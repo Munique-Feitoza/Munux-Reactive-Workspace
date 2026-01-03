@@ -127,6 +127,7 @@ cargo run
 </td>
 </tr>
 </table>
+
 ### 2. 🎮 Complete Gamification System
 
 <div align="center">
@@ -143,12 +144,6 @@ cargo run
 | ⭐ **Legend** | 50+ | Rainbow | Legendary | ⬣ | All Colors |
 
 </div>
-- **Beginner** (Lv 1-9): Cyan theme, basic Tux, ➜ symbol
-- **Terminal** (Lv 10-19): Matrix Green theme, terminal Tux, ► symbol
-- **Hacker** (Lv 20-29): Hacker theme, hacker Tux, ▶ symbol
-- **Cyberpunk** (Lv 30-39): Magenta/Cyan theme, cyberpunk Tux, ◆ symbol
-- **Elite** (Lv 40-49): Purple theme, elite Tux, ⬢ symbol
-- **Legend** (Lv 50+): Rainbow theme, legendary Tux, ⬣ symbol
 
 #### 🏆 Achievements (25+)
 
@@ -190,38 +185,38 @@ cargo run
 <tr>
 <td width="33%">
 
-**🎬 Animations**
-- `sl` - ASCII train
-- `matrix` - Matrix rain
-- `hack` - Hacker mode
+- 👑 500 Commands - "Terminal Master"
 
 </td>
-<td width="33%">
-
-**💬 Interactive**
-- `cowsay` - Talking cow
-- `fortune` - Linux quotes
-- `whoami` - Philosophy
-
-</td>
-<td width="33%">
-
-**🎮 Hidden**
-### 3. 🎯 Smart Reactive Panels
-
-<table>
+</tr>
 <tr>
 <td width="50%">
 
-**📋 Context-Aware Modes:**
-- 🏠 **Welcome** - Evolutionary Tux + motivational messages
-- 📁 **File Tree** - Auto-displays on `ls`, `ll`, `la`
-- 📄 **File Preview** - Syntax highlighting for code
-- 📊 **Resource Monitor** - Real-time CPU/RAM/Swap
+**🔥 Streaks**
+- 🔥 7-Day Streak - "Consistent"
+- 🔥 30-Day Streak - "Dedicated"
+- 🔥 100-Day Streak - "Unstoppable"
 
 </td>
 <td width="50%">
 
+**🚀 Special**
+- 🎯 Quest Master - Complete all quests
+- 🥚 Easter Egg Hunter - Find hidden commands
+- 🌈 Legend Status - Reach level 50
+
+</td>
+</tr>
+</table>
+
+#### 🎯 Dynamic Quests
+
+Quests adapt to your level:
+- 🌱 **Beginner** (Lv 1-9): "Execute your first ls", "Create a file with touch"
+- 💻 **Terminal** (Lv 10-19): "Navigate to /home", "Install a package"
+- 🔓 **Hacker** (Lv 20-29): "Configure Git", "Use SSH to connect"
+- 🌃 **Cyberpunk** (Lv 30-39): "Compile a program", "Create a systemd service"
+- 👑 **Elite** (Lv 40-49): "Write a shell script", "Optimize kernel parameters"
 **🎮 Interactive Modes:**
 - 🚨 **Danger Zone** - Red alerts for risky commands
 - 📈 **Stats Panel** - Success rate, streak, totals
@@ -231,13 +226,8 @@ cargo run
 </td>
 </tr>
 </table>
-- "Execute your first ls"
-- "Create a file with touch"
-- "Navigate to /home"
-- "Install a package"
-- "Configure Git"
-- Progress tracked in real time!
 
+---
 ### 3. 🎯 Smart Reactive Panels
 
 The right panel changes automatically based on what you type:
@@ -268,6 +258,44 @@ Secret commands reveal surprises:
 ```bash
 help          # List of special commands
 help arch     # Manjaro/Arch guide (pacman, yay, paru)
+### 4. 🥚 Easter Eggs (10+)
+
+<table>
+<tr>
+<td width="33%">
+
+**🎬 Animations**
+- `sl` - ASCII train
+- `matrix` - Matrix rain
+- `hack` - Hacker mode
+
+</td>
+<td width="33%">
+
+**💬 Interactive**
+- `cowsay` - Talking cow
+- `fortune` - Linux quotes
+- `whoami` - Philosophy
+
+</td>
+<td width="33%">
+
+**🎮 Hidden**
+- `sudo su` - Uncle Ben
+- `hack the planet` - Hackers
+- `konami code` - Secret bonus
+
+</td>
+</tr>
+</table>
+
+---
+
+### 5. 📚 Integrated Help System
+
+```bash
+help          # List of special commands
+help arch     # Manjaro/Arch guide (pacman, yay, paru)
 help debian   # Ubuntu/Debian guide (apt, dpkg, snap)
 ---
 
@@ -279,33 +307,18 @@ help debian   # Ubuntu/Debian guide (apt, dpkg, snap)
 
 **The Elm Architecture** (Model-View-Update) • **Zero Unsafe Code** • **Idiomatic Rust**
 
-</div>versal Linux commands
-```
-
-### 6. 🛡️ Special Munux Commands
-
-- `stats` - Shows statistics and progress
-- `quests` - Displays active missions
-- `achievements` - Lists unlocked achievements
-- `xp` - Shows current XP and level
-- `xp <number>` - Adds XP (for testing)
-
----
-
-## 🏗️ Architecture
-
-This project follows **The Elm Architecture** (Model-View-Update):
+</div>
 
 ```
 src/
-├── main.rs              # Entry point and main loop
-├── app.rs               # Global state (Model) + command execution
-├── event.rs             # Event handler (input)
-├── tui.rs               # Terminal configuration (Crossterm)
-│
-├── ui/                  # View Layer
-│   ├── mod.rs           # Main renderer
-│   ├── layout.rs        # Defines Split blocks and Popups
+
+### 6. 🛡️ Special Munux Commands
+
+- `stats` - Shows detailed statistics and progress
+- `quests` - Displays active missions with progress bars
+- `achievements` - Lists all unlocked achievements
+- `xp` - Shows current XP and level
+- `xp <number>` - Adds XP (for testing/debugging)t blocks and Popups
 │   ├── terminal.rs      # Renders left panel (terminal)
 │   ├── reactive.rs      # Renders right panel (reactive context)
 │   ├── hud.rs           # Renders status bar and XP
