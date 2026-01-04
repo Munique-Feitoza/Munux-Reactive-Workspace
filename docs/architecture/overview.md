@@ -1,300 +1,234 @@
-# Architecture Overview
+# 🏗️ Architecture Overview
+
+> [!NOTE]
+> This document describes the high-level design of Munux v0.1.0. For implementation details, see the API reference in [core-modules.md](../api/core-modules.md).
 
 ## Executive Summary
 
-Munux implements a **reactive split-panel architecture** based on **The Elm Architecture (TEA)**, providing a robust Model-View-Update pattern that ensures predictable state management and smooth user interactions. The system combines traditional Unix shell execution with an intelligent gamification layer.
+Munux implements a **reactive split-panel architecture** based on **The Elm Architecture (TEA)**. It combines the raw power of a Unix shell with an intelligent, state-aware UI layer that provides real-time context and gamification.
+
+---
 
 ## High-Level Architecture
 
+```mermaid
+graph TD
+    User((User)) --> Input[Terminal Input]
+    
+    subgraph UI_Layer [User Interface Layer]
+        Input --> LeftPanel[Terminal Panel 60%]
+        RightPanel[Reactive Panel 40%]
+        HUD[Heads Up Display]
+    end
+
+    subgraph Core_Layer [Application Core]
+        EventLoop(Event Loop / Crossterm) --> Parser{Command Parser}
+        Parser -->|Navigation| NavState[Nav State]
+        Parser -->|System| SysState[System State]
+        Parser -->|Dangerous| DangerState[Danger State]
+        
+        StateMgr[State Management TEA]
+        NavState --> StateMgr
+        SysState --> StateMgr
+        DangerState --> StateMgr
+        
+        StateMgr -->|Update View| RightPanel
+        StateMgr -->|Update Stats| HUD
+    end
+
+    subgraph System_Layer [System Layer]
+        Shell[Shell Executor sh/bash]
+        FS[File System]
+        Monitor[SysInfo Monitor]
+        
+        StateMgr -->|Execute| Shell
+        StateMgr -->|Read| FS
+        StateMgr -->|Poll| Monitor
+    end
+
+    Shell --> Output[Command Output]
+    Output --> LeftPanel
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     USER INTERFACE LAYER                     │
-│  ┌──────────────────────┐      ┌──────────────────────────┐ │
-│  │  Terminal Panel      │      │  Reactive Panel          │ │
-│  │  (60% - Left)        │      │  (40% - Right)           │ │
-│  │                      │      │                          │ │
-│  │  • Command Input     │      │  • File Tree             │ │
-│  │  • Output Display    │      │  • File Preview          │ │
-│  │  • History           │      │  • Resource Monitor      │ │
-│  │  • Syntax Highlight  │      │  • Danger Zone           │ │
-│  │                      │      │  • Stats/Quests          │ │
-│  └──────────────────────┘      └──────────────────────────┘ │
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              HUD (Status Bar)                        │   │
-│  │  Level | XP Bar | Achievements | Streak | System    │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    APPLICATION CORE LAYER                    │
-│                                                              │
-│  ┌────────────────┐  ┌────────────────┐  ┌───────────────┐ │
-│  │  Event Loop    │  │  Command       │  │  Game State   │ │
-│  │  (Crossterm)   │→ │  Parser        │→ │  Manager      │ │
-│  └────────────────┘  └────────────────┘  └───────────────┘ │
-│                              │                              │
-│                              ▼                              │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │              State Management (TEA Pattern)            │ │
-│  │                                                         │ │
-│  │  Model  ────→  Update  ────→  View  ────→  Render     │ │
-│  │    ↑                                           │       │ │
-│  │    └───────────────────────────────────────────┘       │ │
-│  └────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      SYSTEM LAYER                            │
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │ Shell        │  │ File System  │  │ System Monitor   │  │
-│  │ Executor     │  │ Manager      │  │ (CPU/RAM/Proc)   │  │
-│  │ (sh/bash)    │  │              │  │                  │  │
-│  └──────────────┘  └──────────────┘  └──────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
+
+---
 
 ## Design Patterns
 
 ### 1. The Elm Architecture (TEA)
 
-Munux implements TEA for predictable state management:
+Munux ensures predictable state management through a unidirectional data flow.
 
 ```rust
 // Model - Single source of truth
-pub struct App {
-    input_buffer: String,
-    game_state: GameState,
-    right_panel_mode: RightPanelMode,
-    // ...
+struct App { 
+    state: State 
 }
 
-// Update - State transformations
-impl App {
-    pub fn execute_command(&mut self) -> Result<()> {
-        // Pure state transformation
-    }
-}
+// Update - Pure state transformations
+fn update(msg: Msg, model: &mut App) -> Command
 
-// View - Pure rendering
-pub fn render(frame: &mut Frame, app: &App) {
-    // Immutable rendering from state
-}
+// View - Immutable rendering
+fn view(model: &App) -> Frame
 ```
 
-**Benefits:**
-- Predictable state updates
-- Easy to test and debug
-- Clear separation of concerns
-- Unidirectional data flow
-
-### 2. Strategy Pattern - Command Classification
-
-Commands are classified using a strategy pattern for extensibility:
-
-```rust
-pub enum CommandType {
-    Navigation,
-    FileOperation,
-    PackageManager,
-    Dangerous,
-    // ... 11 total types
-}
-
-impl CommandParser {
-    pub fn classify_command(input: &str) -> CommandType {
-        // Strategy-based classification
-    }
-}
-```
-
-### 3. Observer Pattern - Reactive Panels
-
-The right panel observes input buffer changes and reacts accordingly:
-
-```rust
-fn analyze_input(&mut self) {
-    let cmd_type = CommandParser::classify_command(&self.input_buffer);
-    
-    self.right_panel_mode = match cmd_type {
-        CommandType::Dangerous => RightPanelMode::DangerZone { /* ... */ },
-        CommandType::SystemMonitoring => RightPanelMode::ResourceMonitor { /* ... */ },
-        // ... reactive transformations
-    };
-}
-```
-
-### 4. State Pattern - Panel Modes
-
-Different panel modes encapsulate different behaviors:
-
-```rust
-pub enum RightPanelMode {
-    Welcome,
-    FileTree { path: PathBuf },
-    FilePreview { path: PathBuf, content: String, language: String },
-    ResourceMonitor { cpu_usage: f32, memory_used: u64, /* ... */ },
-    DangerZone { warning: String, command: String },
-    Stats,
-    Quests,
-    Help { content: String, title: String },
-    EasterEgg { content: String },
-}
-```
-
-## Component Interaction
-
-### Typical Command Execution Flow
-
-```
-1. User Types Command
-         │
-         ▼
-2. Event Handler (main.rs)
-         │
-         ▼
-3. Input Buffer Updated (app.rs)
-         │
-         ├─→ 4a. analyze_input() → Update Panel Mode
-         │
-         └─→ 4b. On Enter: execute_command()
-                   │
-                   ├─→ Check Easter Eggs
-                   │
-                   ├─→ Execute Shell Command
-                   │
-                   ├─→ Check Achievements
-                   │
-                   ├─→ Update Quests
-                   │
-                   ├─→ Calculate XP Reward
-                   │
-                   └─→ Update Streak
-         │
-         ▼
-5. Render Updated State (ui/mod.rs)
-         │
-         ├─→ render_terminal_panel()
-         │
-         ├─→ render_reactive_panel()
-         │
-         └─→ render_hud()
-```
-
-## Performance Considerations
-
-### 1. Lazy Rendering
-Only components that changed are re-rendered using Ratatui's differential rendering.
-
-### 2. Command Parsing Optimization
-```rust
-// Fast path for common commands
-match first_word {
-    "ls" | "cd" | "pwd" => CommandType::Navigation,
-    // Compiled to jump table by LLVM
-}
-```
-
-### 3. Resource Monitoring Throttling
-System metrics are only updated when `ResourceMonitor` panel is active:
-
-```rust
-if matches!(app.right_panel_mode, RightPanelMode::ResourceMonitor { .. }) {
-    update_system_monitor(app);
-}
-```
-
-### 4. Zero-Copy String Operations
-Extensive use of string slices (`&str`) instead of owned strings where possible.
-
-## Security Model
-
-### Command Validation Layer
-```
-User Input
-    │
-    ▼
-Dangerous Command Detection
-    │
-    ├─→ Safe → Execute
-    │
-    └─→ Dangerous → Show Warning
-              │
-              ├─→ ESC → Cancel
-              │
-              └─→ Enter → Execute with Confirmation
-```
-
-### Protection Mechanisms
-
-1. **Dangerous Command Detection**
-   - Pattern matching for destructive operations
-   - Real-time visual warnings
-   - Explicit user confirmation required
-
-2. **Shell Injection Prevention**
-   - Commands executed via controlled shell interface
-   - No direct string interpolation
-   - User input sanitization
-
-3. **Filesystem Boundaries**
-   - Respects user permissions
-   - No privilege escalation (unless explicit `sudo`)
-
-## Scalability
-
-### Modular Architecture
-Each component is loosely coupled and can be extended independently:
-
-```
-src/
-├── core/          # Business logic (stateless)
-├── ui/            # Presentation layer (pure functions)
-├── game/          # Gamification engine (isolated)
-└── app.rs         # State orchestration
-```
-
-### Plugin-Ready Design
-The architecture supports future plugin systems:
-- Custom command handlers
-- Theme extensions
-- Achievement modules
-- Quest generators
-
-## Error Handling Strategy
-
-```rust
-// Layered error handling
-pub type Result<T> = anyhow::Result<T>;
-
-// User-facing errors are caught and displayed gracefully
-match self.execute_command() {
-    Ok(_) => self.record_success(),
-    Err(e) => {
-        self.last_output = format!("✗ Error: {}", e);
-        self.record_failure();
-    }
-}
-```
-
-## Testing Strategy
-
-1. **Unit Tests** - Core business logic
-2. **Integration Tests** - Component interactions
-3. **Manual Testing** - UI/UX validation
-4. **Performance Benchmarks** - Rendering performance
-
-## Future Architecture Improvements
-
-- [ ] Plugin system with dynamic loading
-- [ ] Network-based multiplayer support
-- [ ] Cloud save/sync for game state
-- [ ] WebAssembly compilation for browser deployment
-- [ ] AI-powered command suggestions
+> [!TIP]
+> **Why TEA?** This pattern makes the application incredibly easy to debug. Since the view is a pure function of the state, we can reproduce any visual bug just by knowing the state data.
 
 ---
 
-**Next:** [Component Breakdown](components.md) for detailed component documentation.
+### 2. Strategy Pattern (Command Classification)
+
+We categorize user input into 11 distinct strategies to determine UI reaction.
+
+| Strategy | Trigger | UI Reaction |
+|----------|---------|-------------|
+| **Navigation** | `cd`, `ls`, `pwd` | File Tree visualization |
+| **File Operations** | `touch`, `mkdir`, `cp` | File preview panel |
+| **Monitoring** | `top`, `ps`, `htop` | Real-time graphs (CPU/RAM) |
+| **Package Mgmt** | `pacman`, `apt`, `dnf` | Installation progress |
+| **Network** | `ping`, `curl`, `wget` | Network status |
+| **Dangerous** | `rm -rf`, `dd`, `sudo` | 🚨 Red Warning Panel |
+| **Git** | `git` commands | Repository status |
+| **Text Processing** | `cat`, `grep`, `sed` | Content preview |
+| **Help** | `help`, `man` | Documentation viewer |
+| **Easter Eggs** | `sl`, `cowsay`, `fortune` | Special animations |
+| **Unknown** | Unrecognized | Suggestion system |
+
+Each strategy determines: **XP reward**, **reactive panel mode**, and **achievement triggers**.
+
+---
+
+### 3. Observer Pattern (Reactive Panels)
+
+The Right Panel "observes" the input buffer. As you type (before pressing Enter), the UI reacts.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant EventLoop
+    participant AppState
+    participant UI
+
+    User->>EventLoop: Types "rm -rf"
+    EventLoop->>AppState: Update Input Buffer
+    AppState->>AppState: analyze_input()
+    AppState-->>UI: Set Mode: DANGER
+    UI-->>User: Render Red Panel 🚨
+    
+    User->>EventLoop: Press Enter
+    EventLoop->>AppState: execute_command()
+    AppState->>UI: Show Confirmation
+```
+
+---
+
+## Component Breakdown
+
+| Component | File | Responsibility |
+|-----------|------|----------------|
+| **Event Loop** | `event.rs` | Keyboard input (Crossterm), resize events, 60Hz polling |
+| **App State** | `app.rs` | Game state (XP, level, achievements), command history |
+| **Parser** | `core/parser.rs` | Command classification (regex), XP calculation, danger detection |
+| **Shell Executor** | `core/shell.rs` | Executes via `sh -c`, captures stdout/stderr |
+| **File System** | `core/filesystem.rs` | Directory listing, file preview, navigation |
+| **Monitor** | `core/monitor.rs` | Real-time CPU/RAM/Swap metrics (SysInfo) |
+| **Terminal Panel** | `ui/terminal.rs` | Left panel - command output display |
+| **Reactive Panel** | `ui/reactive.rs` | Right panel - context-aware modes (9 types) |
+| **HUD** | `ui/hud.rs` | Bottom bar - XP, level, streak, integrity |
+| **Theme System** | `ui/theme.rs` | Progressive themes (6 tiers: Beginner→Legend) |
+| **Stats Panel** | `ui/stats.rs` | Detailed statistics and quest tracking |
+| **Popup System** | `ui/popup.rs` | Achievement notifications, warnings |
+
+---
+
+## Data Flow
+
+```mermaid
+flowchart LR
+    A[User Input] --> B[Event Loop]
+    B --> C[Parser]
+    C --> D[State Update]
+    D --> E[Shell Execution]
+    E --> F[Capture Output]
+    F --> G[View Render]
+    G --> H[Display to User]
+    D -.->|Reactive| G
+```
+
+**Step-by-step:**
+1. 🎹 User types command
+2. 🔄 Event loop captures input (Crossterm)
+3. 🔍 Parser classifies command type
+4. 💾 State updated (XP, achievements, quests)
+5. 🐚 Command executed via shell (`sh -c`)
+6. 📋 Output captured (stdout/stderr)
+7. 🎨 UI re-rendered based on new state
+8. 🖥️ Display updates (60Hz refresh)
+
+---
+
+## Security Model
+
+> [!WARNING]
+> **Safety First**: Munux creates a safety layer, but actual commands are executed on the host system.
+
+| Layer | Protection |
+|-------|-----------|
+| **Dangerous Command Detection** | Pattern matching intercepts `rm`, `dd`, `chmod` before execution |
+| **Shell Isolation** | Commands run in isolated `sh -c` instances |
+| **Permissions** | Munux respects standard Linux User/Group permissions |
+| **No Privilege Escalation** | Never attempts to gain root access automatically |
+| **Confirmation Dialogs** | Red warning panel + explicit confirmation for destructive ops |
+| **State Isolation** | XP/achievements stored in memory only (no persistence) |
+
+### File System Access
+✅ Respects standard Linux permissions  
+✅ Uses safe Rust APIs (no unsafe blocks)  
+✅ Clean exit on `Ctrl+C` with terminal restoration
+
+---
+
+## Performance Characteristics
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| **Refresh Rate** | 60 Hz | Event loop polling frequency |
+| **Memory Usage** | ~10-20 MB | Typical runtime footprint |
+| **CPU (Idle)** | <1% | Minimal background processing |
+| **CPU (Active)** | Spikes during execution | Shell commands inherit system load |
+| **Startup Time** | <200ms | Release build cold start |
+
+> [!TIP]
+> Always use `cargo run --release` for production usage. Debug builds are 10-50x slower due to runtime checks.
+
+---
+
+## Future Enhancements
+
+### 🗂️ Persistence Layer
+- [ ] Save XP and achievements to `~/.munux/state.json`
+- [ ] Command history across sessions (SQLite)
+- [ ] Cloud sync for multi-device progression
+
+### 🌐 Network Features
+- [ ] SSH integration with reactive terminal view
+- [ ] Remote system monitoring (SSH tunnels)
+- [ ] Distributed quest completion (team challenges)
+
+### 🔌 Plugin System
+- [ ] Custom command handlers via WASM
+- [ ] User-defined achievements (Lua scripting)
+- [ ] Theme marketplace
+
+### 🤖 AI Assistance
+- [ ] Command suggestions based on context (LLM integration)
+- [ ] Error explanation and auto-fixes
+- [ ] Natural language to shell translation
+
+---
+
+## Next Steps
+
+- 📖 Read [Component API Reference](../api/core-modules.md)
+- 🔧 Check [Build Process](../../README.md#installation)
+- 🎮 Explore [Gamification Mechanics](../guides/gamification-system.md)

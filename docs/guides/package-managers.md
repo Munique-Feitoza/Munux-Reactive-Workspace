@@ -1,445 +1,320 @@
-# Package Managers Guide
+# 📦 Package Managers Guide
 
-## Overview
+Munux natively recognizes and gamifies the use of package managers. Using them correctly rewards high XP.
 
-Munux provides comprehensive support for package managers across all major Linux distributions. This guide covers command syntax, best practices, and distribution-specific features.
+![Multi-Distro](https://img.shields.io/badge/Support-Multi--Distro-brightgreen) ![XP Rewards](https://img.shields.io/badge/XP-50%20per%20command-blue)
 
-## Supported Package Managers
+> [!IMPORTANT]
+> **Cross-Distro Support:** Munux detects which distro you are running and adjusts suggestions accordingly.
 
-### Arch Linux / Manjaro
+---
 
-#### Pacman (Official)
+## Arch Linux / Manjaro
 
-**Installation**
+### 🏔️ Pacman & AUR
+
+| Action | Command | Munux Reward |
+|:-------|:--------|:------------:|
+| **Install** | `sudo pacman -S firefox` | `50 XP` |
+| **Remove** | `sudo pacman -Rns firefox` | `50 XP` |
+| **Update** | `sudo pacman -Syu` | `75 XP` |
+| **Search** | `pacman -Ss keyword` | `20 XP` |
+| **Clean Cache** | `sudo pacman -Sc` | `30 XP` |
+| **List Installed** | `pacman -Q` | `10 XP` |
+
+#### AUR Helpers (Yay / Paru)
+
 ```bash
-pacman -S <package>           # Install package
-pacman -S <pkg1> <pkg2>       # Install multiple packages
-sudo pacman -S firefox        # Install Firefox
+# Install from AUR
+yay -S visual-studio-code-bin
+
+# Update AUR packages
+yay -Syu
+
+# Search AUR
+yay -Ss package-name
 ```
 
-**Removal**
+> [!TIP]
+> Munux also supports **Yay** and **Paru**. First use unlocks the **"AUR Explorer"** achievement!
+
+#### Common Patterns
+
 ```bash
-pacman -R <package>           # Remove package
-pacman -Rs <package>          # Remove package + unused dependencies
-pacman -Rns <package>         # Remove package + dependencies + config files
+# Full system upgrade (recommended weekly)
+sudo pacman -Syu
+
+# Install multiple packages
+sudo pacman -S git vim tmux
+
+# Remove package + dependencies
+sudo pacman -Rns package-name
+
+# View package info
+pacman -Si firefox
 ```
 
-**System Update**
+---
+
+## Debian / Ubuntu
+
+### 📦 APT & Snap
+
+| Action | Command | Munux Reward |
+|:-------|:--------|:------------:|
+| **Install** | `sudo apt install git` | `50 XP` |
+| **Remove** | `sudo apt purge git` | `50 XP` |
+| **Update Index** | `sudo apt update` | `25 XP` |
+| **Upgrade Packages** | `sudo apt upgrade` | `50 XP` |
+| **Full Upgrade** | `sudo apt update && sudo apt upgrade` | `75 XP` |
+| **Search** | `apt search keyword` | `20 XP` |
+| **Auto Remove** | `sudo apt autoremove` | `30 XP` |
+
+#### Snap Packages
+
 ```bash
-pacman -Syu                   # Update system (Sync + refresh + upgrade)
-pacman -Syyu                  # Force refresh all package databases
+# Install snap package
+sudo snap install code --classic
+
+# List installed snaps
+snap list
+
+# Update snaps
+sudo snap refresh
 ```
 
-**Search & Info**
+#### Common Patterns
+
 ```bash
-pacman -Ss <keyword>          # Search for packages
-pacman -Qi <package>          # Show installed package info
-pacman -Ql <package>          # List files installed by package
-pacman -Qdt                   # List orphaned packages
+# Typical workflow
+sudo apt update
+sudo apt upgrade -y
+sudo apt autoremove
+
+# Install with auto-yes
+sudo apt install -y nodejs npm
+
+# View package details
+apt show firefox
 ```
 
-**Cache Management**
+> [!NOTE]
+> Using `apt update && apt upgrade` in one command grants bonus XP for efficiency!
+
+---
+
+## Fedora / RHEL
+
+### 🎩 DNF
+
+| Action | Command | Munux Reward |
+|:-------|:--------|:------------:|
+| **Install** | `sudo dnf install htop` | `50 XP` |
+| **Remove** | `sudo dnf remove htop` | `50 XP` |
+| **Update** | `sudo dnf upgrade` | `75 XP` |
+| **Search** | `dnf search keyword` | `20 XP` |
+| **History** | `dnf history` | `30 XP` |
+| **Clean Cache** | `sudo dnf clean all` | `30 XP` |
+
+#### Common Patterns
+
 ```bash
-pacman -Sc                    # Clean package cache
-pacman -Scc                   # Clean all cache (aggressive)
+# Full system update
+sudo dnf upgrade --refresh
+
+# Install group
+sudo dnf group install "Development Tools"
+
+# Rollback last transaction
+sudo dnf history undo last
+
+# Enable repository
+sudo dnf config-manager --set-enabled repo-name
 ```
 
-#### Yay (AUR Helper)
+> [!TIP]
+> Using `dnf history` to rollback changes unlocks the **"Time Traveler"** achievement!
 
-**Installation**
+---
+
+## openSUSE
+
+### 🦎 Zypper
+
+| Action | Command | Munux Reward |
+|:-------|:--------|:------------:|
+| **Install** | `sudo zypper install vim` | `50 XP` |
+| **Remove** | `sudo zypper remove vim` | `50 XP` |
+| **Update** | `sudo zypper update` | `75 XP` |
+| **Search** | `zypper search keyword` | `20 XP` |
+| **Refresh Repos** | `sudo zypper refresh` | `25 XP` |
+
+#### Common Patterns
+
 ```bash
-yay -S <package>              # Install from official repos or AUR
-yay -S spotify                # Install Spotify from AUR
-yay -S visual-studio-code-bin # Install VS Code from AUR
+# Full system upgrade
+sudo zypper refresh && sudo zypper update
+
+# Install pattern (software bundle)
+sudo zypper install -t pattern devel_basis
+
+# List repositories
+zypper repos
 ```
 
-**System Update**
-```bash
-yay -Syu                      # Update system + AUR packages
-yay                           # Shortcut for update
-```
+---
 
-**AUR-Specific Operations**
-```bash
-yay -Ps                       # Print system statistics
-yay -Yc                       # Clean unneeded dependencies
-yay -G <package>              # Download PKGBUILD from AUR
-```
+## Universal: Flatpak
 
-#### Paru (Modern AUR Helper)
+### 📦 Cross-Distribution Package Manager
+
+| Action | Command | Munux Reward |
+|:-------|:--------|:------------:|
+| **Install** | `flatpak install flathub org.gimp.GIMP` | `50 XP` |
+| **Run** | `flatpak run org.gimp.GIMP` | `10 XP` |
+| **Update** | `flatpak update` | `30 XP` |
+| **List Installed** | `flatpak list` | `10 XP` |
 
 ```bash
-paru -S <package>             # Install package
-paru                          # Update all packages
-paru -Sua                     # Update only AUR packages
-paru -c                       # Clean cache
-```
-
-#### Pamac (GUI + CLI)
-
-```bash
-pamac install <package>       # Install package
-pamac remove <package>        # Remove package
-pamac update                  # Update system
-pamac search <keyword>        # Search packages
-```
-
-### Ubuntu / Debian / Mint
-
-#### APT (Advanced Package Tool)
-
-**Installation**
-```bash
-apt install <package>         # Install package
-sudo apt install firefox      # Install Firefox
-apt install -y <package>      # Install without confirmation
-```
-
-**Removal**
-```bash
-apt remove <package>          # Remove package (keep config)
-apt purge <package>           # Remove package + config files
-apt autoremove                # Remove unused dependencies
-```
-
-**System Update**
-```bash
-apt update                    # Update package lists
-apt upgrade                   # Upgrade installed packages
-apt full-upgrade              # Upgrade + handle dependencies
-apt dist-upgrade              # Distribution upgrade
-```
-
-**Search & Info**
-```bash
-apt search <keyword>          # Search for packages
-apt show <package>            # Show package details
-apt list --installed          # List installed packages
-apt list --upgradable         # List upgradable packages
-```
-
-**Cache Management**
-```bash
-apt clean                     # Clean package cache
-apt autoclean                 # Clean obsolete cache files
-```
-
-#### DPKG (Low-level)
-
-```bash
-dpkg -i package.deb           # Install .deb file
-dpkg -r <package>             # Remove package
-dpkg -l                       # List installed packages
-dpkg -L <package>             # List files from package
-dpkg -s <package>             # Show package status
-```
-
-#### Snap (Universal)
-
-```bash
-snap install <package>        # Install snap package
-snap install --classic code   # Install with classic confinement
-snap remove <package>         # Remove snap
-snap refresh                  # Update all snaps
-snap list                     # List installed snaps
-snap find <keyword>           # Search snaps
-```
-
-#### APT-GET (Legacy, but still used)
-
-```bash
-apt-get install <package>     # Install package
-apt-get remove <package>      # Remove package
-apt-get update                # Update package lists
-apt-get upgrade               # Upgrade packages
-apt-get dist-upgrade          # Distribution upgrade
-```
-
-### Fedora / RHEL / CentOS
-
-#### DNF (Dandified YUM)
-
-**Installation**
-```bash
-dnf install <package>         # Install package
-sudo dnf install firefox      # Install Firefox
-dnf install -y <package>      # Install without confirmation
-```
-
-**Removal**
-```bash
-dnf remove <package>          # Remove package
-dnf autoremove                # Remove unused dependencies
-```
-
-**System Update**
-```bash
-dnf update                    # Update all packages
-dnf upgrade                   # Same as update
-dnf check-update              # Check for available updates
-```
-
-**Search & Info**
-```bash
-dnf search <keyword>          # Search packages
-dnf info <package>            # Show package info
-dnf list installed            # List installed packages
-dnf provides <file>           # Find package providing file
-```
-
-**Repository Management**
-```bash
-dnf repolist                  # List enabled repositories
-dnf config-manager --add-repo <url>  # Add repository
-dnf clean all                 # Clean cache
-```
-
-#### YUM (Legacy)
-
-```bash
-yum install <package>         # Install package
-yum remove <package>          # Remove package
-yum update                    # Update packages
-yum search <keyword>          # Search packages
-```
-
-#### RPM (Low-level)
-
-```bash
-rpm -i package.rpm            # Install RPM file
-rpm -e <package>              # Remove package
-rpm -qa                       # List all installed packages
-rpm -ql <package>             # List files from package
-rpm -qi <package>             # Show package info
-```
-
-### openSUSE
-
-#### Zypper
-
-**Installation**
-```bash
-zypper install <package>      # Install package
-zypper in <package>           # Short form
-sudo zypper in firefox        # Install Firefox
-```
-
-**Removal**
-```bash
-zypper remove <package>       # Remove package
-zypper rm <package>           # Short form
-```
-
-**System Update**
-```bash
-zypper refresh                # Refresh repositories (zypper ref)
-zypper update                 # Update packages (zypper up)
-zypper dist-upgrade           # Distribution upgrade (zypper dup)
-```
-
-**Search & Info**
-```bash
-zypper search <keyword>       # Search packages (zypper se)
-zypper info <package>         # Show package info (zypper if)
-zypper packages               # List all packages
-```
-
-**Repository Management**
-```bash
-zypper repos                  # List repositories
-zypper addrepo <url> <alias>  # Add repository
-zypper removerepo <alias>     # Remove repository
-```
-
-### Universal Package Managers
-
-#### Flatpak
-
-```bash
-flatpak install <package>     # Install Flatpak
-flatpak install flathub org.gimp.GIMP  # Install GIMP
-flatpak uninstall <package>   # Uninstall
-flatpak update                # Update all Flatpaks
-flatpak list                  # List installed
-flatpak search <keyword>      # Search Flatpaks
-```
-
-**Add Flathub Repository**
-```bash
+# Add Flathub repository (one-time setup)
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+# Search for apps
+flatpak search gimp
+
+# Uninstall
+flatpak uninstall org.gimp.GIMP
 ```
 
-#### AppImage
+> [!NOTE]
+> First Flatpak usage unlocks the **"Universal Explorer"** achievement!
+
+---
+
+## 🛡️ Best Practices & Safety
+
+Munux encourages safe package management habits.
+
+### ✅ DO:
+
+| Practice | Why | XP Bonus |
+|:---------|:----|:--------:|
+| **Read package lists before confirming** | Avoid unwanted installations | +10 XP |
+| **Update regularly** | Security patches | +25 XP |
+| **Clean package cache** | Save disk space | +20 XP |
+| **Use official repositories first** | Stability | - |
+| **Check dependencies** | Avoid bloat | +15 XP |
+
+### ❌ DON'T:
+
+| Anti-Pattern | Problem | Penalty |
+|:-------------|:--------|:-------:|
+| **Partial upgrades** | `pacman -Sy` without `u` | Breaks streak |
+| **Force install over conflicts** | Can break system | -50 XP |
+| **Skip dependency checks** | Broken packages | -25 XP |
+| **Mix package managers** | Conflicts and duplicates | Warning |
+
+> [!WARNING]
+> **Arch Users:** Never use `pacman -Sy package`. Always use full `pacman -Syu` to avoid partial upgrades.
+
+---
+
+## 🎯 Achievements Related to Package Management
+
+| Achievement | Trigger | Reward |
+|:------------|:--------|:------:|
+| 🏔️ **Arch User** | First `pacman` command | 50 XP |
+| 📦 **Debian Disciple** | First `apt` command | 50 XP |
+| 🎩 **Fedora Faithful** | First `dnf` command | 50 XP |
+| 🦎 **OpenSUSE Fan** | First `zypper` command | 50 XP |
+| 📦 **Flatpak Explorer** | First `flatpak` command | 50 XP |
+| 🌍 **Distro Hopper** | Use 3+ different package managers | 100 XP |
+| 🧹 **Clean Freak** | Clean cache 10 times | 75 XP |
+| 📚 **Package Scholar** | Search for packages 25 times | 50 XP |
+
+---
+
+## 📊 XP Multipliers
+
+Certain patterns grant XP multipliers:
+
+| Pattern | Multiplier | Example |
+|:--------|:----------:|:--------|
+| **Chained Update** | `1.5x` | `sudo apt update && sudo apt upgrade` |
+| **Batch Install** | `1.3x` | `sudo pacman -S vim git tmux htop` |
+| **Safe Removal** | `1.2x` | `sudo pacman -Rns` (removes deps) |
+
+---
+
+## 🔍 Distro Detection
+
+Munux automatically detects your distribution and suggests the appropriate package manager.
+
+```mermaid
+graph TD
+    A[System Check] --> B{Detect Distro}
+    B -->|Has pacman| C[Arch/Manjaro]
+    B -->|Has apt| D[Debian/Ubuntu]
+    B -->|Has dnf| E[Fedora/RHEL]
+    B -->|Has zypper| F[openSUSE]
+    C --> G[Suggest: pacman/yay]
+    D --> H[Suggest: apt/snap]
+    E --> I[Suggest: dnf]
+    F --> J[Suggest: zypper]
+```
+
+When you type an unknown command, Munux will suggest:
+- ✅ The correct package manager for your distro
+- ✅ How to search for the package
+- ✅ Installation command
+
+---
+
+## 🚀 Advanced Tips
+
+### Arch: Downgrade Packages
 
 ```bash
-chmod +x app.AppImage         # Make executable
-./app.AppImage                # Run AppImage
+# View package history
+pacman -Q package-name
+
+# Downgrade using cache
+sudo pacman -U /var/cache/pacman/pkg/package-old-version.pkg.tar.zst
 ```
 
-## Munux Integration
+### Ubuntu: PPA Management
 
-### XP Rewards
+```bash
+# Add PPA
+sudo add-apt-repository ppa:user/ppa-name
 
-Package manager commands provide significant XP rewards:
-
-```yaml
-Base XP: 50 points per package manager command
-Streak Bonus: Up to +50% with 25+ streak
-Total Possible: 75 XP per successful package operation
+# Remove PPA
+sudo add-apt-repository --remove ppa:user/ppa-name
 ```
 
-### Achievements
+### Fedora: Enable RPM Fusion
 
-Special achievements unlock when using package managers:
+```bash
+sudo dnf install https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
+```
 
-- **First Pacman** (🏔️): "Arch User - BTW, I use Arch!" - 50 XP
-- **First APT** (📦): "Debian Disciple" - 50 XP
-- **First DNF**: "Fedora Faithful" - 50 XP
-- **First Zypper**: "openSUSE Enthusiast" - 50 XP
+---
 
-### In-App Help
+## 📚 Related Documentation
 
-Access distribution-specific guides directly in Munux:
+- 🎮 [Gamification System](gamification-system.md) - Understand XP and levels
+- ⚡ [Quick Start](quick-start.md) - First steps with Munux
+- 🔧 [Troubleshooting](troubleshooting.md) - Solve package manager issues
+
+> [!TIP]
+> Type `help <distro>` inside Munux for context-sensitive package manager help!
 
 ```bash
 help arch     # Manjaro/Arch guide
 help debian   # Ubuntu/Debian guide
 help fedora   # Fedora/RHEL guide
-help opensuse # openSUSE guide
+help suse     # openSUSE guide
+help flatpak  # Universal packages
 ```
 
-## Best Practices
-
-### Security
-
-1. **Always use sudo** for system-wide installations
-2. **Verify package sources** before installing from third-party repos
-3. **Read package descriptions** before installing
-4. **Keep system updated** regularly
-
-### Performance
-
-1. **Clean cache regularly** to free disk space
-2. **Remove orphaned packages** to keep system lean
-3. **Use minimal installations** when possible
-4. **Update during off-hours** for large updates
-
-### Safety
-
-1. **Backup before major updates**
-2. **Test new software in virtual machines first**
-3. **Read update changelogs** for breaking changes
-4. **Avoid mixing package managers** for the same software
-
-## Common Tasks
-
-### Installing Development Tools
-
-**Arch/Manjaro**
-```bash
-sudo pacman -S base-devel git cmake
-yay -S visual-studio-code-bin
-```
-
-**Ubuntu/Debian**
-```bash
-sudo apt install build-essential git cmake
-sudo snap install --classic code
-```
-
-**Fedora**
-```bash
-sudo dnf groupinstall "Development Tools"
-sudo dnf install git cmake code
-```
-
-### Installing Media Codecs
-
-**Arch/Manjaro**
-```bash
-sudo pacman -S ffmpeg gstreamer-plugins-{base,good,bad,ugly}
-```
-
-**Ubuntu/Debian**
-```bash
-sudo apt install ubuntu-restricted-extras
-sudo apt install ffmpeg
-```
-
-**Fedora**
-```bash
-sudo dnf install ffmpeg
-sudo dnf install gstreamer1-plugins-{base,good,bad,ugly}
-```
-
-### System Cleanup
-
-**Arch/Manjaro**
-```bash
-sudo pacman -Sc      # Clean cache
-sudo pacman -Rns $(pacman -Qdtq)  # Remove orphans
-```
-
-**Ubuntu/Debian**
-```bash
-sudo apt autoremove  # Remove unused packages
-sudo apt clean       # Clean cache
-```
-
-**Fedora**
-```bash
-sudo dnf autoremove  # Remove unused dependencies
-sudo dnf clean all   # Clean cache
-```
-
-## Troubleshooting
-
-### Package Conflicts
-
-**Arch**
-```bash
-pacman -Syu --overwrite '*'  # Force overwrite conflicting files
-```
-
-**Ubuntu/Debian**
-```bash
-sudo apt --fix-broken install  # Fix broken dependencies
-sudo dpkg --configure -a       # Configure pending packages
-```
-
-**Fedora**
-```bash
-sudo dnf distro-sync  # Synchronize packages
-```
-
-### Locked Database
-
-**Arch**
-```bash
-sudo rm /var/lib/pacman/db.lck
-```
-
-**Ubuntu/Debian**
-```bash
-sudo rm /var/lib/apt/lists/lock
-sudo rm /var/cache/apt/archives/lock
-```
-
-### Failed Updates
-
-1. Check internet connection
-2. Refresh repository lists
-3. Clear package cache
-4. Check disk space
-5. Review error messages carefully
-
-## Additional Resources
-
-- **Arch Wiki**: https://wiki.archlinux.org/
-- **Ubuntu Documentation**: https://help.ubuntu.com/
-- **Fedora Docs**: https://docs.fedoraproject.org/
-- **openSUSE Wiki**: https://en.opensuse.org/Portal:Wiki
-
----
-
-**Next:** [Troubleshooting Guide](troubleshooting.md) for common issues and solutions.
+**Happy package hunting!** 📦🚀

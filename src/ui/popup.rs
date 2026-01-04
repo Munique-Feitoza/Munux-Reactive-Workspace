@@ -4,7 +4,6 @@
 use crate::app::{App, PopupType};
 use crate::ui::layout;
 use ratatui::{
-    backend::Backend,
     layout::Alignment,
     style::{Color, Modifier, Style},
     text::{Line, Span},

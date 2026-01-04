@@ -7,13 +7,12 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, Paragraph},
     Frame,
 };
 
 /// Renderiza painel de estatísticas do jogador
 pub fn render_stats_panel(frame: &mut Frame, app: &App, area: Rect) {
-    use crate::ui::theme::Theme;
     
     let theme = app.game_state.get_theme();
     
@@ -42,9 +41,17 @@ pub fn render_stats_panel(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_general_stats(frame: &mut Frame, game_state: &GameState, theme: &crate::ui::theme::Theme, area: Rect) {
+    use crate::core::monitor::SystemMonitor;
+    
     let success_rate = game_state.success_rate();
     
-    let mut lines = vec![
+    // Captura informações do sistema
+    let mut monitor = SystemMonitor::new();
+    let cpu = monitor.get_cpu_usage();
+    let (mem_used, mem_total) = monitor.get_memory_info();
+    let mem_percent = (mem_used as f64 / mem_total as f64 * 100.0) as f32;
+    
+    let lines = vec![
         Line::from(""),
         Line::from(vec![
             Span::styled("⚡ Comandos Totais: ", Style::default().fg(Color::Gray)),
@@ -82,6 +89,31 @@ fn render_general_stats(frame: &mut Frame, game_state: &GameState, theme: &crate
             Span::styled(
                 format!("{} comandos", game_state.command_streak),
                 Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("💚 Integridade: ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                format!("{}%", game_state.integrity),
+                Style::default().fg(
+                    if game_state.integrity >= 80 { Color::Green }
+                    else if game_state.integrity >= 50 { Color::Yellow }
+                    else { Color::Red }
+                ).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("💻 CPU: ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                format!("{:.1}%", cpu),
+                Style::default().fg(if cpu > 80.0 { Color::Red } else { Color::Cyan }),
+            ),
+            Span::styled(" | ", Style::default().fg(Color::DarkGray)),
+            Span::styled("🧠 RAM: ", Style::default().fg(Color::Gray)),
+            Span::styled(
+                format!("{:.1}%", mem_percent),
+                Style::default().fg(if mem_percent > 80.0 { Color::Red } else { Color::Cyan }),
             ),
         ]),
         Line::from(vec![
@@ -150,8 +182,6 @@ fn render_recent_achievements(frame: &mut Frame, game_state: &GameState, theme: 
 
 /// Renderiza painel de quests
 pub fn render_quests_panel(frame: &mut Frame, app: &App, area: Rect) {
-    use crate::ui::theme::Theme;
-    
     let theme = app.game_state.get_theme();
     
     let block = Block::default()

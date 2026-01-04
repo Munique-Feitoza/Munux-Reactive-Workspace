@@ -1,180 +1,278 @@
-# 🎨 Font and Emoji Configuration - Munux Reactive Workspace
+# 🎨 Fonts and Emoji Configuration Guide
 
-> **Note:** This guide is about configuring fonts for the best Munux experience. For Portuguese speakers, see the original configuration notes at the end of this document.
+Munux uses Unicode characters, emojis, and Nerd Font icons to create a beautiful terminal experience. This guide shows you how to configure your system for optimal display.
 
-## Why Font Configuration Matters
+![Fonts](https://img.shields.io/badge/Nerd_Fonts-Required-blue) ![Unicode](https://img.shields.io/badge/Unicode-UTF--8-green)
 
-Munux uses Unicode characters and emojis throughout the interface:
-- 🐧 Tux penguin (6 evolutionary forms)
-- 🏆 Achievement badges
-- 🔥 Streak indicators
-- 📊 Progress bars
-- ⬢ Level symbols
-- And many more...
+---
 
-Without proper font configuration, you might see:
-- ▯ Empty boxes
-- � Question marks
-- Broken borders
-- Missing emojis
+## Why Nerd Fonts?
 
-## Recommended Fonts
+> [!IMPORTANT]
+> **Nerd Fonts** are patched fonts that include thousands of icons from popular icon packs like Font Awesome, Material Design Icons, and more.
 
-### Best Option: Nerd Fonts
+Without Nerd Fonts, you'll see:
+- ❌ `□` or `?` instead of icons
+- ❌ Misaligned text
+- ❌ Broken UI elements
 
-Nerd Fonts are patched fonts that include thousands of glyphs and icons.
+With Nerd Fonts, you'll see:
+- ✅ Beautiful icons: 🐧 🏆 🔥 ➜ ▶ ◆
+- ✅ Perfect alignment
+- ✅ Professional appearance
 
-**Popular Nerd Fonts:**
-- **JetBrains Mono Nerd Font** (recommended for coding)
-- **Fira Code Nerd Font**
-- **Hack Nerd Font**
-- **Source Code Pro Nerd Font**
-- **Ubuntu Mono Nerd Font**
+---
 
-### Installation
+## Quick Test
 
-#### Arch Linux / Manjaro
+Before configuring, test your current setup:
+
 ```bash
-# Install all Nerd Fonts
-yay -S nerd-fonts-complete
+echo "🐧 Tux | 🏆 Achievement | 🔥 Streak | ➜ Prompt | ▶ Level 2 | ◆ Level 3"
+```
 
-# Or specific font:
+**What you should see:**
+```
+🐧 Tux | 🏆 Achievement | 🔥 Streak | ➜ Prompt | ▶ Level 2 | ◆ Level 3
+```
+
+If you see boxes (`□`) or question marks (`?`), continue reading!
+
+---
+
+## Installation by Distribution
+
+### Arch Linux / Manjaro
+
+> [!TIP]
+> Use AUR for the easiest installation.
+
+```bash
+# Install via AUR (recommended)
 yay -S ttf-jetbrains-mono-nerd
-yay -S ttf-fira-code-nerd
+yay -S ttf-firacode-nerd
 yay -S ttf-hack-nerd
-```
 
-#### Ubuntu / Debian
-```bash
-# Option 1: From repository
-sudo apt install fonts-nerd-font
-
-# Option 2: Manual installation
-# Download from https://www.nerdfonts.com/font-downloads
-# Example for JetBrains Mono:
+# Or install manually
+sudo pacman -S --needed wget unzip
 mkdir -p ~/.local/share/fonts
 cd ~/.local/share/fonts
-wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.1.1/JetBrainsMono.zip
+wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip
 unzip JetBrainsMono.zip
 rm JetBrainsMono.zip
 fc-cache -fv
 ```
 
-#### Fedora
-```bash
-# Install Nerd Fonts from Copr
-sudo dnf copr enable peterwu/iosevka
-sudo dnf install iosevka-term-fonts
+---
 
-# Or manual installation (same as Ubuntu)
-```
+### Ubuntu / Debian
 
-#### openSUSE
 ```bash
-# Manual installation
+# Install dependencies
+sudo apt update
+sudo apt install -y wget unzip fontconfig
+
+# Download and install JetBrains Mono Nerd Font
 mkdir -p ~/.local/share/fonts
 cd ~/.local/share/fonts
-wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.1.1/JetBrainsMono.zip
+wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip
+unzip JetBrainsMono.zip
+rm JetBrainsMono.zip
+
+# Refresh font cache
+fc-cache -fv
+
+# Verify installation
+fc-list | grep "JetBrains"
+```
+
+---
+
+### Fedora / RHEL
+
+```bash
+# Install via DNF (official repositories)
+sudo dnf install -y jetbrains-mono-fonts-all
+
+# Or install Nerd Font variant manually
+sudo dnf install -y wget unzip
+mkdir -p ~/.local/share/fonts
+cd ~/.local/share/fonts
+wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip
 unzip JetBrainsMono.zip
 rm JetBrainsMono.zip
 fc-cache -fv
 ```
 
-### Manual Installation (Any Distro)
+---
 
-1. **Download** your preferred Nerd Font from [nerdfonts.com](https://www.nerdfonts.com/)
+### openSUSE
 
-2. **Extract** the ZIP file
-
-3. **Install** the fonts:
 ```bash
-# System-wide (requires sudo)
-sudo cp *.ttf /usr/share/fonts/truetype/
-sudo fc-cache -fv
-
-# User-only (recommended)
+# Install manually
+sudo zypper install -y wget unzip
 mkdir -p ~/.local/share/fonts
-cp *.ttf ~/.local/share/fonts/
+cd ~/.local/share/fonts
+wget https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip
+unzip JetBrainsMono.zip
+rm JetBrainsMono.zip
 fc-cache -fv
 ```
 
-4. **Verify** installation:
-```bash
-fc-list | grep "JetBrains Mono"
-```
+---
+
+## Recommended Nerd Fonts
+
+| Font | Best For | Download Link |
+|:-----|:---------|:--------------|
+| **JetBrains Mono Nerd Font** | Programming (recommended) | [Download](https://github.com/ryanoasis/nerd-fonts/releases/latest) |
+| **Fira Code Nerd Font** | Ligatures support | [Download](https://github.com/ryanoasis/nerd-fonts/releases/latest) |
+| **Hack Nerd Font** | Clarity at small sizes | [Download](https://github.com/ryanoasis/nerd-fonts/releases/latest) |
+| **Source Code Pro Nerd Font** | Adobe quality | [Download](https://github.com/ryanoasis/nerd-fonts/releases/latest) |
+| **Cascadia Code Nerd Font** | Microsoft's developer font | [Download](https://github.com/ryanoasis/nerd-fonts/releases/latest) |
+
+> [!NOTE]
+> All Nerd Fonts are **free and open source** (SIL Open Font License).
+
+---
 
 ## Terminal Configuration
 
-After installing fonts, configure your terminal emulator:
-
-### GNOME Terminal
-1. Open Terminal → Preferences
-2. Select your profile
-3. Fonts tab
-4. Uncheck "Use system font"
-5. Select your Nerd Font (e.g., "JetBrainsMono Nerd Font Mono")
-6. Font size: 11-13 recommended
+After installing the font, configure your terminal emulator:
 
 ### Konsole (KDE)
-1. Settings → Edit Current Profile
-2. Appearance tab
-3. Select Font → Choose Nerd Font
-4. Apply
+
+```bash
+# 1. Open Konsole
+# 2. Settings → Edit Current Profile
+# 3. Appearance tab
+# 4. Font: JetBrains Mono Nerd Font
+# 5. Size: 11 or 12
+# 6. Apply
+```
+
+---
+
+### GNOME Terminal
+
+```bash
+# 1. Open GNOME Terminal
+# 2. Preferences → Your Profile
+# 3. Text tab
+# 4. ✅ Custom font
+# 5. Select: JetBrains Mono Nerd Font 11
+# 6. Close
+```
+
+---
 
 ### Alacritty
+
 Edit `~/.config/alacritty/alacritty.yml`:
+
 ```yaml
 font:
   normal:
-    family: JetBrainsMono Nerd Font
+    family: "JetBrainsMono Nerd Font"
     style: Regular
+  bold:
+    family: "JetBrainsMono Nerd Font"
+    style: Bold
+  italic:
+    family: "JetBrainsMono Nerd Font"
+    style: Italic
   size: 11.0
 ```
 
+---
+
 ### Kitty
+
 Edit `~/.config/kitty/kitty.conf`:
+
 ```conf
 font_family      JetBrainsMono Nerd Font
+bold_font        auto
+italic_font      auto
+bold_italic_font auto
 font_size 11.0
 ```
 
-### Terminator
-1. Right-click → Preferences
-2. Profiles → General
-3. Uncheck "Use system font"
-4. Select your Nerd Font
+---
 
-### XFCE Terminal
-1. Edit → Preferences
-2. Appearance tab
-3. Font: Select Nerd Font
+### Terminator
+
+```bash
+# 1. Right-click → Preferences
+# 2. Profiles → Default
+# 3. ✅ Use system fixed width font (uncheck)
+# 4. Font: JetBrains Mono Nerd Font 11
+# 5. Close
+```
+
+---
 
 ### Tilix
-1. Preferences → Profile → Default
-2. Font: Select Nerd Font
+
+```bash
+# 1. Preferences → Default Profile
+# 2. Text appearance
+# 3. Custom font: JetBrains Mono Nerd Font 11
+# 4. Close
+```
+
+---
 
 ## Emoji Support
 
+Munux uses emojis extensively: 🐧 🏆 🔥 📊 📁 🎯
+
+### Ensure UTF-8 Locale
+
+```bash
+# Check current locale
+locale
+
+# Expected output includes:
+# LANG=en_US.UTF-8
+# LC_ALL=en_US.UTF-8
+```
+
+If not set correctly:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+# Reload shell
+source ~/.bashrc
+```
+
+---
+
 ### Install Emoji Fonts
 
-#### Ubuntu / Debian
 ```bash
+# Ubuntu/Debian
 sudo apt install fonts-noto-color-emoji
-```
 
-#### Arch / Manjaro
-```bash
+# Arch/Manjaro
 sudo pacman -S noto-fonts-emoji
-```
 
-#### Fedora
-```bash
+# Fedora
 sudo dnf install google-noto-emoji-fonts
+
+# openSUSE
+sudo zypper install noto-coloremoji-fonts
 ```
 
-### Emoji Rendering
+---
 
-Create/edit `~/.config/fontconfig/fonts.conf`:
+## Font Configuration Priority
+
+Create `~/.config/fontconfig/fonts.conf` to prioritize Nerd Font:
+
 ```xml
 <?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
@@ -189,130 +287,183 @@ Create/edit `~/.config/fontconfig/fonts.conf`:
 </fontconfig>
 ```
 
-Then refresh font cache:
+Then refresh:
+
 ```bash
 fc-cache -fv
 ```
 
-## Testing Your Configuration
+---
 
-After configuration, test in a new terminal:
+## Verification Steps
 
-### Test 1: Basic Emojis
+### 1. Test Nerd Font Icons
+
 ```bash
-echo "🐧 🏆 🔥 📊 ⬢ ◆"
+echo -e "\ue0b0 \ue0b1 \ue0b2 \ue0b3"  # Powerline symbols
+echo -e "\uf113 \uf269 \uf489 \uf17c"  # File icons
 ```
-Should display: 🐧 🏆 🔥 📊 ⬢ ◆
 
-### Test 2: Nerd Font Icons
+**Expected:** You should see various triangle and file icons.
+
+---
+
+### 2. Test Emojis
+
 ```bash
-echo "        "
+echo "🐧 🚀 💻 🎮 🏆 🔥 📊 📁 ✅ ❌"
 ```
-Should show various programming icons.
 
-### Test 3: Tux ASCII Art
-Run Munux and check if Tux displays correctly on the welcome screen.
+**Expected:** Colorful emojis (may be monochrome depending on terminal).
 
-### Test 4: Box Drawing Characters
+---
+
+### 3. Test Munux Symbols
+
 ```bash
-echo "┌─────┐"
-echo "│ Box │"
-echo "└─────┘"
+echo "➜ ► ▶ ◆ ⬢ ⬣"
 ```
-Should display a proper box, not broken lines.
+
+**Expected:** Various arrow and shape symbols used for level indicators.
+
+---
+
+### 4. Launch Munux
+
+```bash
+cd Munux-Reactive-Workspace
+cargo run --release
+```
+
+Look for:
+- 🐧 Tux penguin in welcome screen
+- ➜ Prompt symbol
+- 🏆 Achievement icons
+- 🔥 Streak fire
+
+---
 
 ## Troubleshooting
 
-### Problem: Emojis show as boxes
+### Issue: "Font installed but icons still show as boxes"
 
-**Solution:**
-1. Install emoji font (see Emoji Support section)
-2. Update fontconfig (see Emoji Rendering section)
-3. Restart terminal
+**Solution 1:** Clear font cache and rebuild.
 
-### Problem: Nerd Font icons don't show
-
-**Solution:**
-1. Verify font is installed: `fc-list | grep Nerd`
-2. Make sure terminal is using Nerd Font (check terminal settings)
-3. Try different Nerd Font variant (Regular, Mono, etc.)
-
-### Problem: Mixed character sizes
-
-**Solution:**
-- Use the "Mono" variant of Nerd Font
-- Example: "JetBrainsMono Nerd Font Mono" instead of "JetBrainsMono Nerd Font"
-
-### Problem: Tux appears distorted
-
-**Solution:**
-1. Increase terminal font size (11-13 recommended)
-2. Make sure terminal size is at least 80x24
-3. Use monospace Nerd Font
-
-## Recommended Configuration
-
-For best Munux experience:
-
-```
-Font: JetBrainsMono Nerd Font Mono
-Size: 11-12 pt
-Emoji: Noto Color Emoji
-Terminal Size: At least 100x30
-Color Depth: 256 colors (xterm-256color)
+```bash
+fc-cache -fv
+# Restart terminal
 ```
 
-## Additional Resources
+**Solution 2:** Verify font is actually installed.
 
-- **Nerd Fonts Website:** https://www.nerdfonts.com/
-- **Nerd Fonts GitHub:** https://github.com/ryanoasis/nerd-fonts
-- **Font Configuration Guide:** https://wiki.archlinux.org/title/Fonts
-- **Emoji on Linux:** https://wiki.archlinux.org/title/Fonts#Emoji_and_symbols
+```bash
+fc-list | grep -i "nerd"
+```
+
+You should see entries like:
+```
+JetBrainsMono Nerd Font:style=Regular
+```
 
 ---
 
-## Original Portuguese Notes (PT-BR)
+### Issue: "Emojis are black and white instead of color"
 
-<details>
-<summary>Clique para ver a documentação original em português</summary>
+This is **normal** for many terminal emulators. Color emoji support is limited.
 
-### Configuração de Fontes para Munux
-
-O Munux usa caracteres Unicode e emojis em toda a interface. Para melhor experiência:
-
-**Fontes Recomendadas:**
-- JetBrains Mono Nerd Font
-- Fira Code Nerd Font
-- Hack Nerd Font
-
-**Instalação no Manjaro:**
-```bash
-yay -S nerd-fonts-complete
-# ou específico:
-yay -S ttf-jetbrains-mono-nerd
-```
-
-**Configuração no Konsole:**
-1. Configurações → Editar Perfil Atual
-2. Aparência → Selecionar Fonte
-3. Escolher: JetBrainsMono Nerd Font Mono
-4. Tamanho: 11-12
-
-**Emojis:**
-```bash
-sudo pacman -S noto-fonts-emoji
-```
-
-**Testar:**
-```bash
-echo "🐧 Munux é demais! 🚀"
-```
-
-</details>
+**Workaround:** Use a terminal with color emoji support:
+- Kitty ✅
+- Alacritty (with recent versions) ✅
+- GNOME Terminal (limited) ⚠️
+- Konsole (limited) ⚠️
 
 ---
 
-**Last Updated:** January 3, 2026  
-**Version:** v0.1.0 BETA
+### Issue: "Icons are misaligned or overlapping"
 
-For more configuration help, see [Troubleshooting](troubleshooting.md).
+**Solution:** Adjust font size.
+
+Try sizes: **10**, **11**, **12**, or **13** until alignment is perfect.
+
+---
+
+### Issue: "Font looks blurry"
+
+**Solution:** Enable font hinting.
+
+```bash
+# Edit ~/.config/fontconfig/fonts.conf
+<match target="font">
+  <edit name="antialias" mode="assign">
+    <bool>true</bool>
+  </edit>
+  <edit name="hinting" mode="assign">
+    <bool>true</bool>
+  </edit>
+  <edit name="hintstyle" mode="assign">
+    <const>hintfull</const>
+  </edit>
+</match>
+```
+
+---
+
+## Font Size Recommendations
+
+| Terminal Size | Font Size | Use Case |
+|:--------------|:----------|:---------|
+| 1920x1080 | 11-12 | Standard desktop |
+| 2560x1440 | 13-14 | QHD monitor |
+| 3840x2160 | 16-18 | 4K display |
+| 1366x768 | 10-11 | Laptop |
+
+> [!TIP]
+> Adjust based on your eyesight and viewing distance!
+
+---
+
+## Alternative Font Options
+
+If Nerd Fonts don't work for you:
+
+### Option 1: Powerline Fonts (Limited icons)
+
+```bash
+# Ubuntu/Debian
+sudo apt install fonts-powerline
+
+# Arch/Manjaro
+sudo pacman -S powerline-fonts
+```
+
+> [!WARNING]
+> Powerline fonts have fewer icons than Nerd Fonts. Some Munux UI elements may not display correctly.
+
+---
+
+### Option 2: Fallback Mode (Future feature)
+
+A future version of Munux will include a `--no-icons` mode for ASCII-only display.
+
+---
+
+## Best Practices
+
+1. ✅ **Use a Nerd Font** (JetBrains Mono recommended)
+2. ✅ **Install emoji fonts** (Noto Color Emoji)
+3. ✅ **Set UTF-8 locale** (`LANG=en_US.UTF-8`)
+4. ✅ **Use size 11-12** for most displays
+5. ✅ **Enable font antialiasing** for clarity
+6. ✅ **Test before using Munux** (`echo "🐧 ➜ 🏆"`)
+
+---
+
+## Next Steps
+
+After configuring fonts:
+
+1. 🚀 [Launch Munux](quick-start.md)
+2. 📚 [Learn the basics](quick-start.md)
+3. 🎮 [Understand gamification](gamification-system.md)
+
+**Enjoy your beautiful terminal experience!** 🎨✨

@@ -1,440 +1,242 @@
-# Gamification System
+# 🎮 Gamification System
 
-## Overview
+> [!IMPORTANT]
+> Gamification in Munux is designed to reinforce learning, not distract from it. All mechanics incentivize correct CLI usage and exploration.
 
-Munux implements a comprehensive gamification engine that transforms traditional command-line learning into an engaging RPG-like experience. The system is built on four core pillars: **Experience Points (XP)**, **Achievements**, **Quests**, and **Streaks**.
+## The 4 Pillars of Progression
 
-## Experience Points (XP)
+Munux transforms terminal usage into an RPG experience using four core mechanics:
 
-### XP Calculation
-
-XP rewards are dynamically calculated based on command complexity and execution success:
-
-```rust
-Base XP = match command_type {
-    Navigation     => 5 XP
-    FileOperation  => 10 XP
-    FileViewing    => 8 XP
-    PackageManager => 50 XP
-    NetworkTools   => 30 XP
-    SystemAdmin    => 40 XP
-    VersionControl => 25 XP
-    Dangerous      => 25 XP (with warning)
-}
-
-Streak Multiplier = match streak {
-    0-4   => 1.0x
-    5-9   => 1.1x  (+10%)
-    10-24 => 1.25x (+25%)
-    25+   => 1.5x  (+50%)
-}
-
-Final XP = Base XP × Streak Multiplier
-```
-
-### Level Progression
-
-| Level Range | Tier | XP Required | Total XP |
-|-------------|------|-------------|----------|
-| 1-4 | **Iniciante** | 100/level | 0-400 |
-| 5-9 | **Aprendiz** | 150/level | 400-1,150 |
-| 10-19 | **Terminal** | 200/level | 1,150-3,150 |
-| 20-29 | **Hacker** | 250/level | 3,150-5,650 |
-| 30-39 | **Cyberpunk** | 300/level | 5,650-8,650 |
-| 40-49 | **Elite** | 400/level | 8,650-12,650 |
-| 50+ | **Legend** | 500/level | 12,650+ |
-
-### Leveling Benefits
-
-Each tier unlock brings visual and functional changes:
-
-#### Visual Evolution
-- **Theme Colors**: Cyan → Matrix Green → Hacker Cyan → Cyberpunk Magenta → Elite Purple → Legend Rainbow
-- **Tux Character**: 6 different ASCII art variations (Basic → Terminal → Hacker → Cyberpunk → Elite → Legend)
-- **Prompt Symbol**: ➜ → ► → ▶ → ◆ → ⬢ → ⬣
-- **Motivational Messages**: Context-aware level-up messages
-
-#### Functional Unlocks
-- **Level 1-4**: Basic navigation and file operations
-- **Level 5**: File manipulation commands unlocked
-- **Level 10**: Text editors and permissions
-- **Level 20**: Network tools and Git access
-- **Level 30**: Package managers and containerization
-- **Level 40**: Advanced system administration
-
-## Achievements System
-
-### Achievement Categories
-
-#### 1. First Steps (7 achievements)
-```yaml
-first_command:
-  name: "First Command"
-  description: "The Journey Begins"
-  trigger: Execute any command
-  reward: 50 XP
-
-first_ls:
-  name: "First LS"
-  description: "Listing Master"
-  trigger: Execute `ls` command
-  reward: 20 XP
-
-first_cd:
-  name: "First CD"
-  description: "Navigator"
-  trigger: Execute `cd` command
-  reward: 20 XP
-
-first_file:
-  name: "Creator"
-  description: "Created your first file"
-  trigger: Execute `touch` or `echo >`
-  reward: 30 XP
-
-first_rm:
-  name: "Destroyer"
-  description: "Removed your first file"
-  trigger: Execute `rm` command
-  reward: 25 XP
-
-first_sudo:
-  name: "With Great Power..."
-  description: "Executed first sudo command"
-  trigger: Execute `sudo` command
-  reward: 100 XP
-```
-
-#### 2. Package Managers (5 achievements)
-```yaml
-first_pacman:
-  name: "Arch User - BTW, I use Arch!"
-  emoji: "🏔️"
-  trigger: Execute `pacman` command
-  reward: 50 XP
-
-first_apt:
-  name: "Debian Disciple"
-  emoji: "📦"
-  trigger: Execute `apt` command
-  reward: 50 XP
-
-first_git:
-  name: "Version Control Initiate"
-  emoji: "🌿"
-  trigger: Execute `git` command
-  reward: 50 XP
-
-first_ssh:
-  name: "Remote Connection Established"
-  emoji: "🔐"
-  trigger: Execute `ssh` command
-  reward: 40 XP
-
-first_systemctl:
-  name: "System Controller"
-  emoji: "⚙️"
-  trigger: Execute `systemctl` command
-  reward: 40 XP
-```
-
-#### 3. Milestones (4 achievements)
-```yaml
-commands_10:
-  name: "Getting Started"
-  trigger: Execute 10 total commands
-  reward: 100 XP
-
-commands_50:
-  name: "Regular User"
-  trigger: Execute 50 total commands
-  reward: 200 XP
-
-commands_100:
-  name: "Power User"
-  trigger: Execute 100 total commands
-  reward: 500 XP
-
-commands_500:
-  name: "Terminal Master"
-  trigger: Execute 500 total commands
-  reward: 1000 XP
-```
-
-#### 4. Streak Achievements (3 achievements)
-```yaml
-streak_5:
-  name: "On Fire!"
-  emoji: "🔥"
-  trigger: Achieve 5 consecutive successful commands
-  reward: 50 XP
-
-streak_10:
-  name: "Unstoppable!"
-  emoji: "🔥🔥"
-  trigger: Achieve 10 consecutive successful commands
-  reward: 150 XP
-
-streak_25:
-  name: "Legendary!"
-  emoji: "🔥🔥🔥"
-  trigger: Achieve 25 consecutive successful commands
-  reward: 500 XP
-```
-
-#### 5. Level Achievements (5 achievements)
-```yaml
-level_5:
-  name: "Novice Complete"
-  trigger: Reach level 5
-  reward: 100 XP
-
-level_10:
-  name: "Terminal User"
-  trigger: Reach level 10
-  reward: 200 XP
-
-level_20:
-  name: "Hacker Achieved"
-  trigger: Reach level 20
-  reward: 500 XP
-
-level_30:
-  name: "Cyberpunk Elite"
-  trigger: Reach level 30
-  reward: 1000 XP
-
-level_50:
-  name: "Legend Status"
-  trigger: Reach level 50
-  reward: 2000 XP
-```
-
-## Quest System
-
-### Quest Generation
-
-Quests are dynamically generated based on your current level:
-
-```rust
-pub enum QuestObjective {
-    ExecuteCommand { command: String, count: u32 },
-    CreateFile { count: u32 },
-    CreateDirectory { count: u32 },
-    NavigateTo { path: String },
-    ReadFile { count: u32 },
-    DeleteFile { count: u32 },
-    ReachLevel { target_level: u32 },
-    ExecuteAnyCommands { count: u32 },
-}
-```
-
-### Quest Examples by Level
-
-#### Level 1-5: Basic Operations
-```yaml
-- objective: "Execute your first ls command"
-  type: ExecuteCommand(ls, 1)
-  reward: 50 XP
-
-- objective: "Navigate to /home directory"
-  type: NavigateTo(/home)
-  reward: 30 XP
-
-- objective: "Create a file with touch"
-  type: CreateFile(1)
-  reward: 40 XP
-```
-
-#### Level 6-15: File Manipulation
-```yaml
-- objective: "Use grep to search text"
-  type: ExecuteCommand(grep, 1)
-  reward: 60 XP
-
-- objective: "Create 3 directories"
-  type: CreateDirectory(3)
-  reward: 80 XP
-
-- objective: "Read 5 different files"
-  type: ReadFile(5)
-  reward: 100 XP
-```
-
-#### Level 16-30: Advanced Operations
-```yaml
-- objective: "Configure Git with your name"
-  type: ExecuteCommand(git config, 2)
-  reward: 150 XP
-
-- objective: "Install a package"
-  type: ExecuteCommand(pacman/apt, 1)
-  reward: 200 XP
-
-- objective: "Connect via SSH"
-  type: ExecuteCommand(ssh, 1)
-  reward: 180 XP
-```
-
-#### Level 31+: Expert Tasks
-```yaml
-- objective: "Master systemctl (5 commands)"
-  type: ExecuteCommand(systemctl, 5)
-  reward: 300 XP
-
-- objective: "Reach level 50"
-  type: ReachLevel(50)
-  reward: 2000 XP
-```
-
-### Quest Tracking
-
-- **Active Quests**: 3 simultaneous quests
-- **Progress Display**: Real-time progress bars in `quests` panel
-- **Auto-completion**: Quests complete automatically when objectives are met
-- **XP Rewards**: Bonus XP awarded on completion
-- **Quest Refresh**: New quests generated after completion
-
-## Streak System
-
-### Mechanics
-
-```rust
-// Streak increases on successful command
-fn record_success(&mut self) {
-    self.command_streak += 1;
-    self.successful_commands += 1;
-    
-    // Check for streak achievements
-    if self.command_streak == 5 { /* unlock achievement */ }
-    if self.command_streak == 10 { /* unlock achievement */ }
-    if self.command_streak == 25 { /* unlock achievement */ }
-}
-
-// Streak resets on failure
-fn record_failure(&mut self) {
-    self.command_streak = 0;
-    self.failed_commands += 1;
-}
-```
-
-### Streak Bonuses
-
-| Streak | Multiplier | Bonus |
-|--------|------------|-------|
-| 0-4 | 1.0x | None |
-| 5-9 | 1.1x | +10% XP |
-| 10-24 | 1.25x | +25% XP |
-| 25+ | 1.5x | +50% XP |
-
-### Streak Notifications
-
-```
-🔥 Streak: 5  → "You're on fire!"
-🔥🔥 Streak: 10 → "Unstoppable!"
-🔥🔥🔥 Streak: 25 → "LEGENDARY STREAK!"
-```
-
-## Statistics Tracking
-
-### Metrics Collected
-
-```rust
-pub struct GameState {
-    // XP and Level
-    pub xp: u32,
-    pub level: u32,
-    
-    // Command Statistics
-    pub total_commands: u32,
-    pub successful_commands: u32,
-    pub failed_commands: u32,
-    pub command_streak: u32,
-    
-    // Progress Tracking
-    pub achievements: Vec<Achievement>,
-    pub active_quests: Vec<Quest>,
-    
-    // Timestamps
-    pub session_start: DateTime<Utc>,
-}
-```
-
-### Success Rate Calculation
-
-```rust
-pub fn success_rate(&self) -> f32 {
-    if self.total_commands == 0 {
-        return 100.0;
-    }
-    (self.successful_commands as f32 / self.total_commands as f32) * 100.0
-}
-```
-
-### Stats Panel
-
-Access via `stats` command to see:
-- Total commands executed
-- Success rate percentage
-- Current streak
-- Achievements unlocked (count)
-- Active quests with progress
-- Level and XP progress
-
-## Persistence (Future Feature)
-
-### Planned Save System
-
-```rust
-// Save game state to JSON
-pub fn save_state(&self) -> Result<()> {
-    let save_path = dirs::data_dir()
-        .unwrap()
-        .join("munux")
-        .join("save.json");
-    
-    serde_json::to_writer_pretty(File::create(save_path)?, &self)?;
-    Ok(())
-}
-
-// Load game state from JSON
-pub fn load_state() -> Result<GameState> {
-    let save_path = dirs::data_dir()
-        .unwrap()
-        .join("munux")
-        .join("save.json");
-    
-    let file = File::open(save_path)?;
-    Ok(serde_json::from_reader(file)?)
-}
-```
-
-## Easter Eggs
-
-Hidden commands that unlock special achievements:
-
-- `sl` - Steam locomotive animation
-- `fortune` - Random Linux/programming quotes
-- `cowsay` - Customizable ASCII cow
-- `matrix` / `hack` - Matrix-style messages
-- `sudo su` - Uncle Ben quote
-- `hack the planet` - Hackers (1995) reference
-- `konami code` - Secret bonus
-
-## Best Practices
-
-### Maximizing XP Gain
-1. **Maintain High Streaks**: Avoid errors to keep multiplier active
-2. **Complete Quests**: Bonus XP rewards
-3. **Use Complex Commands**: Higher base XP (e.g., package managers)
-4. **Explore New Commands**: First-time bonuses via achievements
-
-### Efficient Leveling
-1. Focus on quest objectives
-2. Use package manager commands (50 XP base)
-3. Maintain 10+ streak for 25% bonus
-4. Complete all available quests before leveling
+1. **Experience Points (XP)** - Earned by executing commands
+2. **Levels & Tiers** - Unlock visual customization and tools
+3. **Achievements** - Badges for specific milestones
+4. **Streaks** - Multipliers for consistency
 
 ---
 
-**Next:** [Package Managers Guide](package-managers.md) for distribution-specific commands.
+## 🏗️ Experience Points (XP)
+
+XP is calculated dynamically based on the complexity of the operation.
+
+$$\text{Total XP} = (\text{Base Command XP}) \times (\text{Streak Multiplier})$$
+
+### XP Values Table
+
+| Command Type | Base XP | Context |
+|:-------------|:-------:|:--------|
+| **Navigation** | `5 XP` | `cd`, `ls`, `pwd` |
+| **File Ops** | `10 XP` | `mkdir`, `touch`, `cp` |
+| **Text Processing** | `15 XP` | `grep`, `sed`, `awk` |
+| **Git** | `25 XP` | `git commit`, `git push` |
+| **Network** | `30 XP` | `ping`, `curl`, `ssh` |
+| **Admin** | `40 XP` | `systemctl`, `journalctl` |
+| **Package Mgr** | `50 XP` | `pacman`, `apt`, `dnf` |
+| **Dangerous** | `25 XP` | Correct usage of `rm` or `sudo` |
+
+> [!NOTE]
+> Dangerous commands give XP **only** if used correctly. Destructive errors penalize your streak!
+
+---
+
+## 🏆 Level Progression
+
+> [!NOTE]
+> Leveling up unlocks new themes for the UI and evolves your **Tux Avatar**.
+
+| Level | Tier Name | Visual Identity | Unlocks |
+|:-----:|:----------|:----------------|:--------|
+| **1-9** | 🌱 **Beginner** | Cyan Theme | Basic Commands |
+| **10-19** | 💻 **Terminal** | Matrix Green | File Manipulation |
+| **20-29** | 🔓 **Hacker** | Hacker Cyan | Text Editors (`nano`/`vim`) |
+| **30-39** | 🌃 **Cyberpunk** | Cyberpunk Magenta | Git & Networking |
+| **40-49** | 👑 **Elite** | Elite Purple | Docker & Containers |
+| **50+** | ⭐ **Legend** | Rainbow/RGB | **God Mode** |
+
+### Level Up Rewards
+
+Each tier grants:
+- 🎨 **New Theme** - Visual evolution of UI colors
+- 🐧 **Tux Evolution** - ASCII art transformation
+- ⚡ **Symbol Change** - Unique command prompt icon
+- 🏆 **Milestone Badge** - Permanent achievement
+
+---
+
+## 🏅 Achievements
+
+Achievements provide large bursts of XP and unique badges displayed in your profile.
+
+### Category: Package Managers
+*Designed to encourage distro-agnostic learning.*
+
+| Badge | Title | Trigger | Reward |
+|:-----:|:------|:--------|:------:|
+| 🏔️ | **Arch User** | Use `pacman` | `50 XP` |
+| 📦 | **Debian Disciple** | Use `apt` | `50 XP` |
+| 🎩 | **Fedora Faithful** | Use `dnf` | `50 XP` |
+| 🦎 | **OpenSUSE Fan** | Use `zypper` | `50 XP` |
+| 📦 | **Flatpak Explorer** | Use `flatpak` | `50 XP` |
+
+### Category: First Steps
+*Fundamental CLI operations.*
+
+| Badge | Title | Trigger | Reward |
+|:-----:|:------|:--------|:------:|
+| 🎯 | **First Command** | Execute any command | `10 XP` |
+| 📁 | **Navigator** | Use `cd` | `20 XP` |
+| 👀 | **Observer** | Use `ls` | `20 XP` |
+| ✏️ | **Creator** | Create file with `touch` | `30 XP` |
+| 🗑️ | **Destroyer** | Use `rm` safely | `30 XP` |
+| 🔐 | **Superuser** | First `sudo` command | `40 XP` |
+
+### Category: Milestones
+*Long-term commitment tracking.*
+
+| Badge | Title | Trigger | Reward |
+|:-----:|:------|:--------|:------:|
+| 🎯 | **Getting Started** | 10 commands executed | `50 XP` |
+| 🚀 | **Regular User** | 50 commands executed | `100 XP` |
+| 💎 | **Power User** | 100 commands executed | `200 XP` |
+| 👑 | **Terminal Master** | 500 commands executed | `500 XP` |
+
+### Category: Streaks
+*Designed to build consistency.*
+
+| Badge | Title | Trigger | Reward |
+|:-----:|:------|:--------|:------:|
+| 🔥 | **On Fire!** | 5 commands without errors | `1.2x` multiplier |
+| 🔥🔥 | **Unstoppable!** | 10 commands without errors | `1.5x` multiplier |
+| 🔥🔥🔥 | **LEGENDARY!** | 25 commands without errors | `2.0x` multiplier |
+
+> [!TIP]
+> Use the command `stats` at any time to view your unlocked badges and current streak multiplier.
+
+---
+
+## ⚔️ Quest System
+
+Quests are procedurally generated missions based on your current level.
+
+```mermaid
+graph LR
+    A[Level Detected] --> B{Generate Quests}
+    B -->|Beginner| C[Basic Commands]
+    B -->|Terminal| D[File Operations]
+    B -->|Hacker| E[Git & SSH]
+    B -->|Cyberpunk| F[System Admin]
+    B -->|Elite| G[Advanced Tasks]
+    C --> H[Track Progress]
+    D --> H
+    E --> H
+    F --> H
+    G --> H
+    H -->|Complete| I[Award XP]
+```
+
+### Quest Examples by Tier
+
+| Tier | Quest Examples |
+|:-----|:--------------|
+| 🌱 **Beginner** | "Execute your first `ls`", "Create a file with `touch`", "Navigate to /home" |
+| 💻 **Terminal** | "Use `grep` to find text", "Install a package", "Check disk usage with `df`" |
+| 🔓 **Hacker** | "Configure Git", "Use SSH to connect", "Create a symbolic link" |
+| 🌃 **Cyberpunk** | "Compile a program", "Create a systemd service", "Use `tmux` or `screen`" |
+| 👑 **Elite** | "Write a shell script", "Optimize kernel parameters", "Set up a firewall" |
+| ⭐ **Legend** | "Master of all commands!" (No more quests - you are the master!) |
+
+**How it works:**
+1. The system monitors your command `history`
+2. When a quest criteria is met, a notification toast appears
+3. XP is awarded immediately
+4. New quests are generated automatically
+
+> [!NOTE]
+> Press `Q` key at any time to view your active quest log.
+
+---
+
+## 🔥 Streak System
+
+Streaks track consecutive successful commands (no errors).
+
+| Streak | Multiplier | Visual Effect |
+|:------:|:----------:|:--------------|
+| 0-4 | `1.0x` | Normal |
+| 5-9 | `1.2x` | 🔥 Fire icon |
+| 10-24 | `1.5x` | 🔥🔥 Double fire |
+| 25+ | `2.0x` | 🔥🔥🔥 **GODLIKE** |
+
+**Streak Breaks:**
+- ❌ Command returns non-zero exit code
+- ❌ Syntax error in command
+- ❌ Permission denied error
+
+**Streak Safe Commands:**
+- ✅ `help` - Never breaks streak
+- ✅ `stats` - Safe to check progress
+- ✅ `cd` to non-existent dir - Forgiven (learning!)
+
+---
+
+## 🎨 Theme Unlocks
+
+Each level tier grants a unique visual theme.
+
+| Tier | Theme Name | Primary Color | Accent | Description |
+|:----:|:-----------|:--------------|:-------|:------------|
+| 🌱 | **Cyan Dreams** | Light Blue | Cyan | Calm and welcoming |
+| 💻 | **Matrix Vision** | Green | Lime | Classic hacker aesthetic |
+| 🔓 | **Cyber Pulse** | Cyan | Magenta | Futuristic neon glow |
+| 🌃 | **Night City** | Magenta | Yellow | Cyberpunk 2077 inspired |
+| 👑 | **Royal Court** | Purple | Gold | Elegant and powerful |
+| ⭐ | **Legend Mode** | Rainbow | All | Dynamic RGB cycling |
+
+Themes affect:
+- Panel borders
+- Text highlighting
+- Tux ASCII art colors
+- Achievement notification colors
+- Progress bars
+
+---
+
+## 📊 Progression Formula
+
+$$\text{XP to Next Level} = 100 \times \text{Current Level}$$
+
+**Example:**
+- Level 1 → 2: 100 XP
+- Level 2 → 3: 200 XP
+- Level 5 → 6: 500 XP
+- Level 10 → 11: 1000 XP
+
+This creates a smooth progression curve that rewards consistent play without requiring excessive grinding.
+
+---
+
+## 🛠️ Development Tips
+
+> [!TIP]
+> **Testing XP System:** Use the command `xp <number>` to add XP directly for testing purposes.
+
+```bash
+# Add 500 XP (dev only)
+xp 500
+
+# Check current stats
+stats
+
+# View active quests
+quests
+```
+
+---
+
+## Next Steps
+
+- 🎯 Try unlocking your first achievement!
+- 🔥 Build a streak of 10+ commands
+- 📊 Use `stats` to track your progress
+- 🏆 Reach level 10 to unlock the Matrix theme
+
+See [Quick Start Guide](quick-start.md) for beginner commands or check [Troubleshooting](troubleshooting.md) if you encounter issues.

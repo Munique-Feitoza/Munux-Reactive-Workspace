@@ -187,6 +187,8 @@ impl App {
     pub fn execute_command(&mut self) -> Result<()> {
         use crate::game::achievements::AchievementChecker;
         use crate::game::easter_eggs::EasterEggs;
+        use crate::game::logic;
+        use crate::core::parser::CommandParser;
         
         if self.input_buffer.trim().is_empty() {
             return Ok(());
@@ -197,6 +199,12 @@ impl App {
         self.history_index = None;
         
         let command = self.input_buffer.clone().trim().to_string();
+        
+        // Verifica se é comando perigoso ANTES de executar
+        let cmd_type = CommandParser::classify_command(&command);
+        if matches!(cmd_type, crate::core::parser::CommandType::Dangerous) {
+            self.game_state.damage_integrity(10);
+        }
         
         // Verifica easter eggs primeiro
         if let Some(easter_egg_output) = EasterEggs::check(&command) {
@@ -345,8 +353,20 @@ Pressione ESC para voltar ao modo normal.
             self.right_panel_mode = RightPanelMode::FileTree { 
                 path: self.current_dir.clone() 
             };
-            self.game_state.add_xp(5);
+            
+            // Sistema de XP dinâmico
+            let xp_reward = logic::calculate_xp_reward(&command, true);
+            self.game_state.add_xp(xp_reward);
             self.game_state.increment_commands();
+            self.game_state.record_success();
+            
+            // Verifica conquistas
+            if let Some((id, name, desc, xp)) = logic::check_achievements(&command, self.game_state.total_commands) {
+                if !self.game_state.has_achievement(id) {
+                    self.game_state.unlock_achievement(id.to_string(), name.to_string(), desc.to_string(), xp);
+                    self.show_achievement_popup(name, desc);
+                }
+            }
         } else {
             // Executa comandos externos via shell
             use crate::core::shell::ShellExecutor;
@@ -375,14 +395,32 @@ Pressione ESC para voltar ao modo normal.
                         format!("✗ Erro na execução:\n{}", helpful_output)
                     };
                     
-                    // Atualiza XP se o comando foi bem-sucedido
+                    // Sistema de XP dinâmico baseado no comando
+                    let xp_reward = logic::calculate_xp_reward(&command, output.success);
                     if output.success {
-                        self.game_state.add_xp(10);
+                        let old_level = self.game_state.level;
+                        let leveled_up = self.game_state.add_xp(xp_reward);
                         self.game_state.increment_commands();
                         self.game_state.record_success();
+                        self.game_state.restore_integrity(5); // Recupera integridade em comandos bem-sucedidos
+                        
+                        // Notificação de Level Up
+                        if leveled_up {
+                            self.show_level_up_popup(old_level, self.game_state.level);
+                            self.game_state.refresh_quests();
+                        }
+                        
+                        // Verifica conquistas
+                        if let Some((id, name, desc, xp)) = logic::check_achievements(&command, self.game_state.total_commands) {
+                            if !self.game_state.has_achievement(id) {
+                                self.game_state.unlock_achievement(id.to_string(), name.to_string(), desc.to_string(), xp);
+                                self.show_achievement_popup(name, desc);
+                            }
+                        }
                     } else {
                         self.game_state.increment_commands();
                         self.game_state.record_failure();
+                        self.game_state.damage_integrity(3); // Perde integridade em erros
                     }
                     
                     // Atualiza visualização da árvore de arquivos após comandos que podem modificar
@@ -561,6 +599,29 @@ Pressione ESC para voltar ao modo normal.
     /// Fecha o popup ativo
     pub fn close_popup(&mut self) {
         self.active_popup = None;
+    }
+    
+    /// Mostra popup de Level Up
+    fn show_level_up_popup(&mut self, old_level: u32, new_level: u32) {
+        let rank = self.game_state.get_rank();
+        let message = crate::ui::theme::Theme::get_level_message(new_level);
+        self.show_popup(
+            "🎉 LEVEL UP!".to_string(),
+            format!(
+                "Nível {} → {}\n\n{}\n\n{}",
+                old_level, new_level, rank, message
+            ),
+            PopupType::Success,
+        );
+    }
+    
+    /// Mostra popup de conquista desbloqueada
+    fn show_achievement_popup(&mut self, name: &str, description: &str) {
+        self.show_popup(
+            "🏆 Conquista Desbloqueada!".to_string(),
+            format!("{}\n\n{}", name, description),
+            PopupType::Success,
+        );
     }
     
     /// Adiciona dicas educativas baseadas em erros comuns

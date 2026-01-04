@@ -3,7 +3,6 @@
 
 use crate::app::App;
 use ratatui::{
-    backend::Backend,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},

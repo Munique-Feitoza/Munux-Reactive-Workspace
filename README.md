@@ -52,21 +52,21 @@ cargo run
 </div>
 
 ```text
-+--------------------------------+------------------------------+
-| FULL TERMINAL (60%)            | REACTIVE PANEL (40%)         |
-|                                |                              |
-| ➜ [Beginner@munux]$           | 🐧 WELCOME TO MUNUX          |
-| pacman -Syu                    | 📊 STATS & PROGRESS          |
-|   ✓ System updated!            | ━━━━━━━━━━━━━━━━━━━━━━━━━   |
-| 🏆 Arch User - BTW, I use Arch!| Level 5 | XP: 450/500       |
-|                                | Streak: 12 🔥                |
-| yay -S firefox                 | 📋 ACTIVE QUESTS             |
-|   ✓ Installing Firefox...     | ☑ First pacman (2/2)         |
-| +50 XP! 🎯 Quest complete!     | ☐ Git Explorer (0/5)         |
-|                                | ☐ Network Master (1/10)      |
-+--------------------------------+------------------------------+
++---------------------------------+------------------------------+
+| FULL TERMINAL (60%)             | REACTIVE PANEL (40%)         |
+|                                 |                              |
+| ➜ [Beginner@munux]$             | 🐧 WELCOME TO MUNUX          |
+| pacman -Syu                     | 📊 STATS & PROGRESS          |
+|   ✓ System updated!             | ━━━━━━━━━━━━━━━━━━━━━━━━━    |
+| 🏆 Arch User - BTW, I use Arch! | Level 5 | XP: 450/500        |
+|                                 | Streak: 12 🔥                |
+| yay -S firefox                  | 📋 ACTIVE QUESTS             |
+|   ✓ Installing Firefox...       | ☑ First pacman (2/2)         |
+| +50 XP! 🎯 Quest complete!      | ☐ Git Explorer (0/5)         |
+|                                 | ☐ Network Master (1/10)      |
++---------------------------------+------------------------------+
 | [Lv 5 - Terminal] XP: 450/500 ▰▰▰▰▰▱▱▱ | 🏆 12 | 🔥 Streak: 12 |
-+--------------------------------+------------------------------+
++---------------------------------+------------------------------+
 ```
 
 ---
@@ -83,7 +83,7 @@ cargo run
 
 **ALL Linux commands work normally!** Munux executes real commands via shell.
 
-<table>
+<table align="center">
 <tr>
 <td width="50%">
 
@@ -171,6 +171,7 @@ cargo run
 
 </td>
 </tr>
+<table>
 <tr>
 <td width="50%">
 
@@ -179,18 +180,13 @@ cargo run
 - 🚀 50 Commands - "Regular User"
 - 💎 100 Commands - "Power User"
 - 👑 500 Commands - "Terminal Master"
-### 4. 🥚 Easter Eggs (10+)
+</td>
+</tr>
 
 <table>
 <tr>
-<td width="33%">
-
-- 👑 500 Commands - "Terminal Master"
-
-</td>
-</tr>
-<tr>
 <td width="50%">
+
 
 **🔥 Streaks**
 - 🔥 7-Day Streak - "Consistent"
@@ -216,7 +212,7 @@ Quests adapt to your level:
 - 💻 **Terminal** (Lv 10-19): "Navigate to /home", "Install a package"
 - 🔓 **Hacker** (Lv 20-29): "Configure Git", "Use SSH to connect"
 - 🌃 **Cyberpunk** (Lv 30-39): "Compile a program", "Create a systemd service"
-- 👑 **Elite** (Lv 40-49): "Write a shell script", "Optimize kernel parameters"
+- 👑 **Elite** (Lv 40-49): "Write a shell script", "Optimize kernel parameters"  
 **🎮 Interactive Modes:**
 - 🚨 **Danger Zone** - Red alerts for risky commands
 - 📈 **Stats Panel** - Success rate, streak, totals
@@ -310,32 +306,19 @@ help debian   # Ubuntu/Debian guide (apt, dpkg, snap)
 </div>
 
 ```
-src/
 
 ### 6. 🛡️ Special Munux Commands
 
+```
 - `stats` - Shows detailed statistics and progress
 - `quests` - Displays active missions with progress bars
 - `achievements` - Lists all unlocked achievements
 - `xp` - Shows current XP and level
 - `xp <number>` - Adds XP (for testing/debugging)t blocks and Popups
-│   ├── terminal.rs      # Renders left panel (terminal)
-│   ├── reactive.rs      # Renders right panel (reactive context)
-│   ├── hud.rs           # Renders status bar and XP
-│   ├── stats.rs         # Renders Stats and Quests panels
-│   ├── popup.rs         # Popups and confirmations
-│   └── theme.rs         # Progressive theme system (6 tiers)
-│
-├── core/                # Business Logic (Update)
-│   ├── parser.rs        # Parses commands (11 types)
-│   ├── shell.rs         # Executes system commands
-│   ├── filesystem.rs    # Manages file operations
-│   └── monitor.rs       # Collects system metrics (CPU/RAM)
-│
-└── game/                # Complete Gamification System
-    ├── state.rs         # XP, levels, achievements, quests, streaks
-    ├── logic.rs         # Level Up rules and XP calculation
+
 ---
+
+```
 
 <div align="center">
 
@@ -343,22 +326,7 @@ src/
 
 *Get started in less than 5 minutes!*
 
-</div>aster eggs and secret commands
-    └── distro_guide.rs  # Command guides by distribution
-```
-
-### Data Flow
-
-1. **Event** (`event.rs`): User presses a key
-2. **Update** (`app.rs`): Application state is updated
-3. **Parser** (`core/parser.rs`): Analyzes input (Navigation, PackageManager, etc.)
-4. **Execute** (`app.rs`): Command executed via shell + achievements/quests checks
-5. **View** (`ui/`): Ratatui renders the next frame with appropriate theme
-6. **Repeat**: Event-based reactive loop
-
----
-
-## 📦 Installation and Usage
+</div>
 
 ### Prerequisites
 
@@ -383,55 +351,11 @@ cargo build --release
 ./target/release/munux-reactive-workspace
 ```
 
-### 🎮 Getting Started
-
-```bash
-# 1. Start Munux
-cargo run
-
-# 2. Try basic commands (earn XP!)
-ls
-pwd
-mkdir test
-cd test
-touch file.txt
-echo "Hello Munux" > file.txt
-cat file.txt
-
-# 3. Check your progress
-stats           # Detailed statistics
-quests          # Active missions
-achievements    # Unlocked achievements
-
-# 4. Use package managers (unlocks achievements!)
-# Manjaro/Arch:
-pacman -Syu     # Updates system
-yay -S firefox  # Installs Firefox
-
-# Ubuntu/Debian:
----
-
 <div align="center">
 
 ## ⌨️ Controls
 
-*Simple and intuitive keyboard shortcuts*
-
 </div>
-# 5. Explore easter eggs
-sl
-fortune
-cowsay "Munux is awesome!"
-
-# 6. Get help
-help            # List special commands
-help arch       # Guide for Manjaro/Arch
-help debian     # Guide for Ubuntu/Debian
-```
-
----
-
-## ⌨️ Controls
 
 | Key | Action |
 |-----|--------|
@@ -446,108 +370,11 @@ help debian     # Guide for Ubuntu/Debian
 
 ---
 
-## 🎮 Detailed Gamification System
-
-### 📊 Level Progression (6 Tiers)
-
-| Level | Tier | Theme | Tux | Symbol | XP Required |
-|-------|------|-------|-----|--------|-------------|
-| 1-9 | **Beginner** | Cyan | Basic | ➜ | 0-900 |
-| 10-19 | **Terminal** | Matrix Green | Terminal | ► | 1000-1900 |
-| 20-29 | **Hacker** | Cyan/Green | Hacker | ▶ | 2000-2900 |
-| 30-39 | **Cyberpunk** | Magenta/Cyan | Cyberpunk | ◆ | 3000-3900 |
-| 40-49 | **Elite** | Purple | Elite | ⬢ | 4000-4900 |
-| 50+ | **Legend** | Rainbow | Legend | ⬣ | 5000+ |
-
-**Visual Evolution**: Tux and colors evolve with you! The more you use, the more cyberpunk it gets.
-
-### 🏆 Complete Achievements
-
-#### First Steps
-- ✅ **First Command** - "The Journey Begins" (50 XP)
-- ✅ **First LS** - "Listing Master" (20 XP)
-- ✅ **First CD** - "Navigator" (20 XP)
-- ✅ **First File** - "Creator" (30 XP)
-- ✅ **First RM** - "Destroyer" (25 XP)
-- ✅ **First Sudo** - "With Great Power..." (100 XP)
-
-#### Package Managers
-- 🏔️ **First Pacman** - "Arch User - BTW, I use Arch!" (50 XP)
-- 📦 **First APT** - "Debian Disciple" (50 XP)
-- 🌿 **First Git** - "Version Control Initiate" (50 XP)
-- 🔐 **First SSH** - "Remote Connection Established" (40 XP)
-- ⚙️ **First Systemctl** - "System Controller" (40 XP)
-
-#### Command Milestones
-- 🎯 **10 Commands** - "Getting Started" (100 XP)
-- 🚀 **50 Commands** - "Regular User" (200 XP)
-- 💎 **100 Commands** - "Power User" (500 XP)
-- 👑 **500 Commands** - "Terminal Master" (1000 XP)
-
-#### Streaks
-- 🔥 **5 Streak** - "On Fire!" (50 XP)
-- 🔥🔥 **10 Streak** - "Unstoppable!" (150 XP)
-- 🔥🔥🔥 **25 Streak** - "Legendary!" (500 XP)
-
-#### Levels
-- ⭐ **Level 5** - "Novice Complete" (100 XP)
-- ⭐⭐ **Level 10** - "Terminal User" (200 XP)
-- ⭐⭐⭐ **Level 20** - "Hacker Achieved" (500 XP)
-- 💫 **Level 30** - "Cyberpunk Elite" (1000 XP)
-- 🌟 **Level 50** - "Legend Status" (2000 XP)
-
-### 📋 Quest System
-
-Quests are dynamically generated based on your level:
-
-**Level 1-5** (Basic):
-- "Execute your first ls command"
-- "Navigate to /home directory"
-- "Create a file with touch"
-- "Read a file with cat"
-
-**Level 6-15** (Intermediate):
-- "Use grep to search text"
-- "Create a directory and navigate to it"
-- "Execute 5 different commands"
-- "Use pipes (|) for the first time"
-
-**Level 16-30** (Advanced):
----
-
 <div align="center">
 
 ## 🔬 Technologies Used
-
-*Powered by the best tools in the Rust ecosystem*
-
-</div>emotely"
-- "Execute 10 network commands"
-
-**Level 31+** (Elite):
-- "Master systemctl (5 commands)"
-- "Reach level 50"
-- "Unlock all achievements"
-
-### 🔥 Streak System
-
-- **Each correct command**: +1 streak
-- **Each error**: Streak resets to 0
-- **Streak 5+**: +10% XP bonus
----
-
-<div align="center">
-
-## 🛣️ Roadmap
-
-*The future of Munux is bright!*
 
 </div>
-**Tip**: Keep streak high to level up faster!
-
----
-
-## 🔬 Technologies Used
 
 | Crate | Version | Purpose |
 |-------|---------|---------|
@@ -560,7 +387,11 @@ Quests are dynamically generated based on your level:
 
 ---
 
+<div align="center">
+
 ## 🛣️ Roadmap
+
+</div>
 
 ### ✅ Version 0.1.0 - COMPLETE
 - [x] Base architecture (The Elm Architecture)
@@ -574,18 +405,7 @@ Quests are dynamically generated based on your level:
 - [x] Dynamic quest system
 - [x] Easter eggs (10+)
 - [x] Streak system with bonuses
----
-
-<div align="center">
-
-## 🤝 Contributing
-
-*Join the community and help make Munux even better!*
-
-[![Contributors Welcome](https://img.shields.io/badge/Contributors-Welcome-brightgreen?style=flat-square)](docs/contributing/code-of-conduct.md)
-
-</div>ts and progress
-- [x] Evolutionary Tux (6 forms)
+- [x] Evolutionary Tux (6 forms)  
 
 ### 🚧 Version 0.2.0 - In Planning
 - [ ] Progress persistence (save/load state)
@@ -609,43 +429,10 @@ Quests are dynamically generated based on your level:
 
 ## 📚 Documentation
 
-*Comprehensive guides for everyone*
+Complete documentation is available in the [`docs/`](docs/) directory:
 
 </div>
----
 
-## 🤝 Contributing
-
-Contributions are welcome! This is an educational and open-source project.
-
-### How to Contribute
-
-1. Fork the project
-2. Create a branch for your feature (`git checkout -b feature/MyFeature`)
-3. Commit your changes (`git commit -m 'Add MyFeature'`)
-4. Push to the branch (`git push origin feature/MyFeature`)
-5. Open a Pull Request
-
-### Areas That Need Help
----
-
-<div align="center">
-
-## ❓ FAQ
-
-*Frequently Asked Questions*
-
-</div>e achievements and easter eggs
-- 📦 Support for more package managers (emerge, nix, etc.)
-- 🌍 Translations (Spanish, French, etc.)
-- 📖 Tutorials and educational quests
-- 🧪 Tests and bug fixes
-
----
-
-## 📚 Documentation
-
-Complete documentation is available in the [`docs/`](docs/) directory:
 
 ### For Users
 - **[Quick Start Guide](docs/guides/quick-start.md)** - Get started in 5 minutes
@@ -655,37 +442,36 @@ Complete documentation is available in the [`docs/`](docs/) directory:
 - **[Troubleshooting](docs/guides/troubleshooting.md)** - Common issues and solutions
 - **[Testing Guide](docs/TESTING.md)** - Comprehensive testing documentation
 
----
-
-<div align="center">
-
-## 💡 Inspirations
-
-*Standing on the shoulders of giants*
-
-</div>API](docs/api/core-modules.md)** - Technical API documentation
+### For Developers
+- **[Architecture Overview](docs/architecture/overview.md)** - High-level design
+- **[Component Breakdown](docs/architecture/)** - Detailed component documentation
+- **[Core Modules API](docs/api/core-modules.md)** - Technical API documentation
 - **[Build Status](docs/BUILD_STATUS.md)** - Build information and status
 - **[Changelog](docs/CHANGELOG.md)** - Version history and updates
 
+### For Contributors
+- **[Code of Conduct](docs/contributing/code-of-conduct.md)** - Community standards
+- **[Contributing Guide](docs/contributing/)** - How to contribute
+- **[Project Stats](docs/PROJECT_STATS.md)** - Project statistics and metrics
+
 ---
 
 <div align="center">
 
-## 📄 License
-
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](LICENSE)
-
-</div>Stats](docs/PROJECT_STATS.md)** - Project statistics and metrics
-
----
-
 ## ❓ FAQ
 
-**Q: Does Munux replace my terminal?**
+*Frequently Asked Questions*
+
+</div>
+
+**Q: Does Munux replace my terminal?**  
 A: Yes! Munux is a fully functional terminal. All Linux commands work normally.
 
-**Q: Which distro does it work on?**
+**Q: Which distro does it work on?**  
 A: Works on **any Linux distro**. Tested on Manjaro, Ubuntu, Fedora, Debian, Arch.
+
+**Q: How do I unlock all themes?**  
+A: Level up! New themes are unlocked at levels 10, 20, 30, 40, and 50.
 
 ---
 
@@ -696,23 +482,24 @@ A: Works on **any Linux distro**. Tested on Manjaro, Ubuntu, Fedora, Debian, Arc
 *Created with passion for the Linux community*
 
 </div>
-**Q: How do I unlock all themes?**
-### **Munique Alves Pacheco Feitoza**
+
+**Munique Alves Pacheco Feitoza**
 
 [![GitHub](https://img.shields.io/badge/GitHub-Munique--Feitoza-181717?style=for-the-badge&logo=github)](https://github.com/Munique-Feitoza)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Munique%20Feitoza-0077B5?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/munique-feitoza)
 
 ---
+<div align="center">
 
 ## 🙏 Acknowledgments
 
-*Thank you to the amazing open-source community!*
-
 </div>
 
-## 💡 Inspirations
+- Rust Community: For the incredible ecosystem and support.
+- Ratatui: For the best TUI library in existence.
+- Arch/Manjaro Community: For the inspiration behind the package manager integration.
+- You: For using and contributing to Munux!
 
----
 
 <div align="center">
 
@@ -732,7 +519,7 @@ If you like this project, please consider:
 ┌─────────────────────────────────────────────────────────┐
 │  "The best way to learn is by doing.                    │
 │   The best way to do is by playing."                    │
-│                                                          │
+│                                                         │
 │  🐧 Munux Reactive Workspace                            │
 │  Learning terminal commands, one XP at a time. 🚀       │
 └─────────────────────────────────────────────────────────┘
@@ -744,45 +531,5 @@ If you like this project, please consider:
 
 Licensed under [GNU GPL v3.0](LICENSE) • [Report Bug](https://github.com/Munique-Feitoza/Munux-Reactive-Workspace/issues) • [Request Feature](https://github.com/Munique-Feitoza/Munux-Reactive-Workspace/issues)
 
-</div>u can use commercially
-- ⚠️ Modifications must be open-source under GPLv3
-- ⚠️ Must include copyright notice
-
-See the [LICENSE](LICENSE) file for more details.
-
----
-
-## 👤 Author
-
-**Munique Alves Pacheco Feitoza**
-
-- GitHub: [@Munique-Feitoza](https://github.com/Munique-Feitoza)
-- LinkedIn: [Munique Feitoza](https://linkedin.com/in/munique-feitoza)
-- Project: [Munux-Reactive-Workspace](https://github.com/Munique-Feitoza/Munux-Reactive-Workspace)
-
----
-
-## 🙏 Acknowledgments
-
-- Inspired by the need for better educational tools to learn Linux
-- Rust community for the amazing language
-- Ratatui for the powerful TUI library
-- Everyone who contributes to the open-source ecosystem
-
----
-
-## ⭐ Show Your Support
-
-If you liked the project, leave a ⭐ on the repository!
-
----
-
-<div align="center">
-
-**Made with ❤️ and lots of ☕ using Rust 🦀**
-
-*"The best way to learn is by doing. The best way to do is by playing."*
-
-**Munux Reactive Workspace** - *Learning terminal commands, one XP at a time.* 🚀
 
 </div>

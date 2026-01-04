@@ -147,15 +147,12 @@ impl GameState {
     /// Retorna o título/rank baseado no nível
     pub fn get_rank(&self) -> &str {
         match self.level {
-            1 => "Visitante",
-            2..=4 => "Aprendiz",
-            5..=9 => "Terminal User",
-            10..=14 => "Script Kiddie",
-            15..=19 => "Developer",
-            20..=29 => "Sysadmin",
-            30..=49 => "Hacker",
-            50..=99 => "Guru",
-            _ => "Legend",
+            1..=9 => "🌱 Beginner",
+            10..=19 => "💻 Terminal",
+            20..=29 => "🔓 Hacker",
+            30..=39 => "🌃 Cyberpunk",
+            40..=49 => "👑 Elite",
+            _ => "⭐ Legend",
         }
     }
     

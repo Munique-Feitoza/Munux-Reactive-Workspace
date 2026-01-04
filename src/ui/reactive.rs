@@ -3,7 +3,6 @@
 
 use crate::app::{App, RightPanelMode};
 use ratatui::{
-    backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -71,6 +70,8 @@ fn render_file_tree_with_hint(frame: &mut Frame, path: &std::path::Path, input: 
 
 /// Renderiza a árvore de arquivos
 fn render_file_tree(frame: &mut Frame, path: &std::path::Path, area: Rect) {
+    use crate::core::filesystem::FileSystemManager;
+    
     let block = Block::default()
         .borders(Borders::ALL)
         .title(" 📂 Navegação ")
@@ -84,43 +85,43 @@ fn render_file_tree(frame: &mut Frame, path: &std::path::Path, area: Rect) {
         Span::raw(".."),
     ])));
     
-    // Lista arquivos e diretórios
-    if let Ok(entries) = fs::read_dir(path) {
-        let mut entries: Vec<_> = entries.filter_map(|e| e.ok()).collect();
-        entries.sort_by_key(|e| e.path());
-        
-        for entry in entries.iter().take(20) { // Limita a 20 itens para não poluir
-            let entry_path = entry.path();
-            let name = entry_path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("???")
-                .to_string(); // Converte para String para evitar lifetime issues
-            
-            let (icon, color) = if entry_path.is_dir() {
-                ("📁 ", Color::Yellow)
-            } else if name.ends_with(".rs") {
-                ("🦀 ", Color::LightRed)
-            } else if name.ends_with(".sh") {
-                ("📜 ", Color::Green)
-            } else if name.ends_with(".toml") || name.ends_with(".json") {
-                ("⚙ ", Color::Blue)
-            } else if name.ends_with(".md") {
-                ("📝 ", Color::Cyan)
-            } else if name.ends_with(".py") {
-                ("🐍 ", Color::Yellow)
-            } else if name.ends_with(".js") || name.ends_with(".ts") {
-                ("📄 ", Color::LightYellow)
+    // Lista arquivos e diretórios usando FileSystemManager
+    if let Ok(entries) = FileSystemManager::list_directory(path) {
+        for entry in entries.iter().take(20) { // Limita a 20 itens
+            let icon = entry.get_icon();
+            let color = if entry.is_dir {
+                Color::Yellow
+            } else if entry.name.ends_with(".rs") {
+                Color::LightRed
+            } else if entry.name.ends_with(".sh") {
+                Color::Green
+            } else if entry.name.ends_with(".toml") || entry.name.ends_with(".json") {
+                Color::Blue
+            } else if entry.name.ends_with(".md") {
+                Color::Cyan
+            } else if entry.name.ends_with(".py") {
+                Color::Yellow
             } else {
-                ("📄 ", Color::White)
+                Color::White
+            };
+            
+            let size_str = if !entry.is_dir {
+                format!(" ({})", FileSystemManager::format_size(entry.size))
+            } else {
+                String::new()
             };
             
             items.push(ListItem::new(Line::from(vec![
                 Span::styled(format!("{} ", icon), Style::default().fg(color)),
-                Span::raw(name),
+                Span::raw(entry.name.clone()),
+                Span::styled(size_str, Style::default().fg(Color::DarkGray)),
             ])));
         }
     } else {
-        items.push(ListItem::new("Erro ao ler diretório"));
+        items.push(ListItem::new(Line::from(vec![
+            Span::styled("⚠ ", Style::default().fg(Color::Red)),
+            Span::raw("Erro ao ler diretório"),
+        ])));
     }
     
     let list = List::new(items).block(block);
