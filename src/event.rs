@@ -7,6 +7,7 @@ use std::time::Duration;
 
 /// Tipos de eventos que a aplicação pode receber
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum Event {
     /// Evento de tecla pressionada
     Key(KeyEvent),

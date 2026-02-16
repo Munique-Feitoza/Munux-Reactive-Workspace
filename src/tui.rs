@@ -46,9 +46,11 @@ pub fn restore() -> Result<()> {
 }
 
 /// RAII guard que garante que o terminal será restaurado
+#[allow(dead_code)]
 pub struct TerminalGuard;
 
 impl TerminalGuard {
+    #[allow(dead_code)]
     pub fn new() -> Result<Self> {
         init()?;
         Ok(Self)

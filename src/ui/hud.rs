@@ -35,7 +35,7 @@ pub fn render_hud(frame: &mut Frame, app: &App, area: Rect) {
         .split(inner);
     
     // 1. Informações do Jogador (Nível e Rank)
-    let rank = app.game_state.get_rank();
+    let rank = app.game_state.get_rank(&app.i18n);
     let symbol = Theme::get_prompt_symbol(app.game_state.level);
     
     let info_text = Line::from(vec![
@@ -46,7 +46,7 @@ pub fn render_hud(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            format!("[Nv {}] ", app.game_state.level),
+            format!("[{} {}] ", app.i18n.tc("ui-level"), app.game_state.level),
             Style::default()
                 .fg(theme.primary)
                 .add_modifier(Modifier::BOLD),
@@ -64,8 +64,7 @@ pub fn render_hud(frame: &mut Frame, app: &App, area: Rect) {
     
     // 2. Barra de XP
     let xp_percent = ((app.game_state.xp as f64 / app.game_state.xp_to_next_level as f64) * 100.0) as u16;
-    let xp_label = format!(
-        "XP: {}/{} ({:.0}%)",
+    let xp_label = app.i18n.xp_label(
         app.game_state.xp,
         app.game_state.xp_to_next_level,
         (app.game_state.xp as f64 / app.game_state.xp_to_next_level as f64) * 100.0
