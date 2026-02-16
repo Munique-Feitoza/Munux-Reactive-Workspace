@@ -9,27 +9,33 @@ use ratatui::{
     widgets::{Block, Borders, Gauge, List, ListItem, Paragraph, Wrap},
     Frame,
 };
+use fluent::FluentArgs;
 use std::fs;
 
 /// Renderiza o painel direito reativo (o "camaleão")
 pub fn render_reactive_panel(frame: &mut Frame, app: &App, area: Rect) {
+    use ratatui::widgets::Clear;
+    
+    // Limpa área para evitar ghosting
+    frame.render_widget(Clear, area);
+
     match &app.right_panel_mode {
         RightPanelMode::Welcome => render_welcome_screen(frame, app, area),
         RightPanelMode::FileTree { path } => {
             // Se tiver input, mostra dica + arquivos
-            render_file_tree_with_hint(frame, path, &app.input_buffer, area)
+            render_file_tree_with_hint(frame, path, &app.input_buffer, app, area)
         }
         RightPanelMode::FilePreview { path, content, language } => {
-            render_file_preview(frame, path, content, language, area)
+            render_file_preview(frame, path, content, language, app, area)
         }
         RightPanelMode::ResourceMonitor { cpu_usage, memory_used, memory_total, process_count } => {
-            render_resource_monitor(frame, *cpu_usage, *memory_used, *memory_total, *process_count, area)
+            render_resource_monitor(frame, *cpu_usage, *memory_used, *memory_total, *process_count, app, area)
         }
         RightPanelMode::DangerZone { warning, command } => {
-            render_danger_zone(frame, warning, command, area)
+            render_danger_zone(frame, warning, command, app, area)
         }
         RightPanelMode::Gamification { message, celebration } => {
-            render_gamification(frame, message, *celebration, area)
+            render_gamification(frame, message, *celebration, app, area)
         }
         RightPanelMode::Stats => {
             crate::ui::stats::render_stats_panel(frame, app, area)
@@ -38,20 +44,25 @@ pub fn render_reactive_panel(frame: &mut Frame, app: &App, area: Rect) {
             crate::ui::stats::render_quests_panel(frame, app, area)
         }
         RightPanelMode::EasterEgg { content } => {
-            render_easter_egg(frame, content, area)
+            render_easter_egg(frame, content, app, area)
         }
         RightPanelMode::Help { content, title } => {
-            render_help_panel(frame, content, title, area)
+            render_help_panel(frame, content, title, app, area)
+        }
+        RightPanelMode::CommandHelp { command, description, examples, tip } => {
+            render_command_help(frame, command, description, examples, tip, &app.i18n, area)
+        }
+        RightPanelMode::CommandOutput(content) => {
+            render_command_output(frame, content, app.scroll, app, area)
         }
     }
 }
 
-/// Renderiza árvore de arquivos com dica sobre comando
-fn render_file_tree_with_hint(frame: &mut Frame, path: &std::path::Path, input: &str, area: Rect) {
+fn render_file_tree_with_hint(frame: &mut Frame, path: &std::path::Path, input: &str, app: &App, area: Rect) {
     // Se tem input, divide área em dica + arquivos
     if !input.is_empty() {
         let parts: Vec<&str> = input.split_whitespace().collect();
-        if let Some(hint) = get_command_hint(parts.get(0).copied().unwrap_or("")) {
+        if let Some(hint) = get_command_hint(parts.get(0).copied().unwrap_or(""), app) {
             // Divide área: 30% dica, 70% arquivos
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -59,23 +70,24 @@ fn render_file_tree_with_hint(frame: &mut Frame, path: &std::path::Path, input: 
                 .split(area);
             
             render_hint(frame, &hint, chunks[0]);
-            render_file_tree(frame, path, chunks[1]);
+            render_file_tree(frame, path, app, chunks[1]);
             return;
         }
     }
     
     // Sem input ou sem dica, mostra só arquivos
-    render_file_tree(frame, path, area);
+    render_file_tree(frame, path, app, area);
 }
 
 /// Renderiza a árvore de arquivos
-fn render_file_tree(frame: &mut Frame, path: &std::path::Path, area: Rect) {
+fn render_file_tree(frame: &mut Frame, path: &std::path::Path, app: &App, area: Rect) {
     use crate::core::filesystem::FileSystemManager;
     
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(" 📂 Navegação ")
-        .border_style(Style::default().fg(Color::Cyan));
+        .title(format!(" 📂 {} ", app.i18n.navigation_title()))
+        .border_style(Style::default().fg(Color::Cyan))
+        .style(Style::default().bg(Color::Black));
     
     let mut items = Vec::new();
     
@@ -91,18 +103,15 @@ fn render_file_tree(frame: &mut Frame, path: &std::path::Path, area: Rect) {
             let icon = entry.get_icon();
             let color = if entry.is_dir {
                 Color::Yellow
-            } else if entry.name.ends_with(".rs") {
-                Color::LightRed
-            } else if entry.name.ends_with(".sh") {
-                Color::Green
-            } else if entry.name.ends_with(".toml") || entry.name.ends_with(".json") {
-                Color::Blue
-            } else if entry.name.ends_with(".md") {
-                Color::Cyan
-            } else if entry.name.ends_with(".py") {
-                Color::Yellow
             } else {
-                Color::White
+                match entry.name.split('.').last() {
+                    Some("rs") => Color::LightRed,
+                    Some("sh") => Color::Green,
+                    Some("toml") | Some("json") => Color::Blue,
+                    Some("md") => Color::Cyan,
+                    Some("py") => Color::Yellow,
+                    _ => Color::White,
+                }
             };
             
             let size_str = if !entry.is_dir {
@@ -120,7 +129,7 @@ fn render_file_tree(frame: &mut Frame, path: &std::path::Path, area: Rect) {
     } else {
         items.push(ListItem::new(Line::from(vec![
             Span::styled("⚠ ", Style::default().fg(Color::Red)),
-            Span::raw("Erro ao ler diretório"),
+            Span::raw(app.i18n.tc("ui-err-read-dir")),
         ])));
     }
     
@@ -134,6 +143,7 @@ fn render_file_preview(
     path: &std::path::Path,
     content: &str,
     _language: &str,
+    app: &App,
     area: Rect,
 ) {
     let filename = path.file_name()
@@ -142,14 +152,17 @@ fn render_file_preview(
     
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(format!(" 📄 Preview: {} ", filename))
-        .border_style(Style::default().fg(Color::Green));
+        .title(format!(" 📄 {} ", app.i18n.preview_title(filename)))
+        .border_style(Style::default().fg(Color::Green))
+        .style(Style::default().bg(Color::Black));
     
     // Preview com tratamento de erro melhorado e sugestões
     let text = if !content.is_empty() {
         content.to_string()
     } else if path.is_dir() {
-        format!("❌ Erro: '{}' é um diretório, não um arquivo!\n\n💡 Use 'ls {}' para listar o conteúdo.", filename, filename)
+        let mut args = FluentArgs::new();
+        args.set("name", filename);
+        format!("{}\n\n{}", app.i18n.t("ui-err-is-dir", Some(&args)), app.i18n.t("ui-err-is-dir-hint", Some(&args)))
     } else if !path.exists() {
         // Busca arquivos similares
         let mut suggestions = Vec::new();
@@ -175,12 +188,12 @@ fn render_file_preview(
     } else if let Ok(file_content) = fs::read_to_string(path) {
         let lines: Vec<&str> = file_content.lines().take(30).collect();
         if lines.is_empty() {
-            "[Arquivo vazio]".to_string()
+            format!("[{}]", app.i18n.tc("ui-empty-file"))
         } else {
             lines.join("\n")
         }
     } else {
-        "❌ Erro ao ler arquivo (muito grande ou sem permissão)".to_string()
+        app.i18n.tc("ui-err-read-file")
     };
     
     let paragraph = Paragraph::new(text)
@@ -198,12 +211,14 @@ fn render_resource_monitor(
     memory_used: u64,
     memory_total: u64,
     process_count: usize,
+    app: &App,
     area: Rect,
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(" 📊 Monitor de Recursos ")
-        .border_style(Style::default().fg(Color::Blue));
+        .title(format!(" 📊 {} ", app.i18n.resource_title()))
+        .border_style(Style::default().fg(Color::Blue))
+        .style(Style::default().bg(Color::Black));
     
     // Divide em seções
     let chunks = Layout::default()
@@ -219,7 +234,7 @@ fn render_resource_monitor(
     
     // CPU Gauge
     let cpu_gauge = Gauge::default()
-        .block(Block::default().title("CPU Usage"))
+        .block(Block::default().title(app.i18n.cpu_usage_label()))
         .gauge_style(Style::default().fg(Color::Cyan))
         .percent(cpu_usage as u16);
     frame.render_widget(cpu_gauge, chunks[0]);
@@ -231,15 +246,17 @@ fn render_resource_monitor(
         0
     };
     let mem_gauge = Gauge::default()
-        .block(Block::default().title("Memory"))
+        .block(Block::default().title(app.i18n.tc("ui-memory")))
         .gauge_style(Style::default().fg(Color::Yellow))
         .percent(mem_percent);
     frame.render_widget(mem_gauge, chunks[1]);
     
     // Informações adicionais
     let info = Paragraph::new(format!(
-        "Processos: {}\nMemória: {} / {} MB",
+        "{}: {}\n{}: {} / {} MB",
+        app.i18n.tc("ui-processes"),
         process_count,
+        app.i18n.tc("ui-memory"),
         memory_used / 1024 / 1024,
         memory_total / 1024 / 1024
     ));
@@ -251,13 +268,14 @@ fn render_danger_zone(
     frame: &mut Frame,
     warning: &str,
     command: &str,
+    app: &App,
     area: Rect,
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(ratatui::widgets::BorderType::Double)
-        .title(" ⚠️  ZONA DE PERIGO  ⚠️ ")
-        .title_bottom(" 🚨 COMANDO DESTRUTIVO DETECTADO 🚨 ")
+        .title(format!(" ⚠️  {}  ⚠️ ", app.i18n.danger_title()))
+        .title_bottom(format!(" 🚨 {} 🚨 ", app.i18n.tc("sys-danger-detected")))
         .border_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
         .style(Style::default().bg(Color::Black));
     
@@ -273,7 +291,7 @@ fn render_danger_zone(
         Line::from(vec![
             Span::raw("                    "),
             Span::styled(
-                "║  ⚠️   ATENÇÃO MÁXIMA   ⚠️  ║",
+                format!("║  ⚠️   {}   ⚠️  ║", app.i18n.tc("ui-attention-max")),
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD | Modifier::SLOW_BLINK),
             ),
         ]),
@@ -288,7 +306,7 @@ fn render_danger_zone(
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                "   COMANDO DETECTADO:",
+                format!("   {}:", app.i18n.tc("ui-command-detected")),
                 Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             ),
         ]),
@@ -305,7 +323,7 @@ fn render_danger_zone(
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                "   RISCO:",
+                format!("   {}:", app.i18n.tc("ui-risk")),
                 Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             ),
         ]),
@@ -322,27 +340,27 @@ fn render_danger_zone(
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                "   ⚡ CONSEQUÊNCIAS POSSÍVEIS:",
+                format!("   ⚡ {}:", app.i18n.tc("sys-consequences")),
                 Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
             Span::raw("   • "),
-            Span::styled("Perda permanente de dados", Style::default().fg(Color::Red)),
+            Span::styled(app.i18n.tc("ui-data-loss"), Style::default().fg(Color::Red)),
         ]),
         Line::from(vec![
             Span::raw("   • "),
-            Span::styled("Sistema pode ficar instável", Style::default().fg(Color::Red)),
+            Span::styled(app.i18n.tc("ui-unstable-system"), Style::default().fg(Color::Red)),
         ]),
         Line::from(vec![
             Span::raw("   • "),
-            Span::styled("Danos irreversíveis ao sistema", Style::default().fg(Color::Red)),
+            Span::styled(app.i18n.tc("ui-irreversible-damage"), Style::default().fg(Color::Red)),
         ]),
         Line::from(""),
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                "   AÇÕES DISPONÍVEIS:",
+                format!("   {}:", app.i18n.tc("ui-available-actions")),
                 Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
             ),
         ]),
@@ -355,7 +373,7 @@ fn render_danger_zone(
                     .add_modifier(Modifier::BOLD | Modifier::REVERSED),
             ),
             Span::styled(
-                " Cancelar (Recomendado)",
+                format!(" {}", app.i18n.tc("ui-cancel-rec")),
                 Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
             ),
         ]),
@@ -368,7 +386,7 @@ fn render_danger_zone(
                     .add_modifier(Modifier::BOLD | Modifier::REVERSED),
             ),
             Span::styled(
-                " Executar MESMO ASSIM (Perigoso!)",
+                format!(" {}", app.i18n.tc("ui-execute-anyway")),
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ),
         ]),
@@ -380,7 +398,7 @@ fn render_danger_zone(
                 Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "Sempre faça backup antes de executar comandos destrutivos!",
+                app.i18n.tc("ui-backup-tip"),
                 Style::default().fg(Color::Gray),
             ),
         ]),
@@ -399,11 +417,12 @@ fn render_gamification(
     frame: &mut Frame,
     message: &str,
     celebration: bool,
+    app: &App,
     area: Rect,
 ) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(" 🎮 Level Up! ")
+        .title(format!(" 🎮 {} ", app.i18n.level_up_title()))
         .border_style(Style::default().fg(Color::Magenta))
         .style(Style::default().bg(Color::Black));
     
@@ -430,121 +449,13 @@ fn render_gamification(
 }
 
 /// Retorna dica sobre comando
-fn get_command_hint(command: &str) -> Option<String> {
-    match command {
-        // Navegação básica
-        "ls" => Some("💡 'ls' lista arquivos\nFato: vem de 'LiSt'".to_string()),
-        "cd" => Some("💡 'cd' muda diretório\nDica: use TAB!".to_string()),
-        "pwd" => Some("💡 pwd mostra local\nPrint Working Dir".to_string()),
-        
-        // Arquivos
-        "cat" => Some("💡 'cat' mostra arquivo\nCurioso: concatena!".to_string()),
-        "mkdir" => Some("⚠️ mkdir cria PASTA\nPara arquivo: 'touch'".to_string()),
-        "touch" => Some("💡 touch cria ARQUIVO\nPara pasta: 'mkdir'".to_string()),
-        "rm" => Some("🚨 rm remove ARQUIVO\nPasta: 'rm -r'".to_string()),
-        "cp" => Some("💡 cp copia arquivos\ncp origem destino".to_string()),
-        "mv" => Some("💡 mv move/renomeia\nmv antigo novo".to_string()),
-        
-        // Editores
-        "nano" | "vim" => Some("💡 Editor de texto\nNano: Ctrl+X sai".to_string()),
-        
-        // Sistema
-        "sudo" => Some("🚨 SUPER USUÁRIO\nCuidado! Poder total".to_string()),
-        "top" | "htop" => Some("💡 Monitor de processos\nq para sair".to_string()),
-        
-        // Pacman (Arch/Manjaro)
-        "pacman" => Some("📦 Gerenciador Arch/Manjaro\n-S instala | -R remove | -Syu atualiza".to_string()),
-        "yay" | "paru" => Some("📦 AUR Helper (Manjaro)\nMesmo uso do pacman + AUR".to_string()),
-        
-        // APT (Debian/Ubuntu)
-        "apt" | "apt-get" => Some("📦 Gerenciador Debian/Ubuntu\ninstall | remove | update | upgrade".to_string()),
-        
-        // DNF/YUM (Fedora/RHEL)
-        "dnf" | "yum" => Some("📦 Gerenciador Fedora/RHEL\ninstall | remove | update".to_string()),
-        
-        // Zypper (openSUSE)
-        "zypper" => Some("📦 Gerenciador openSUSE\nin instala | rm remove | up atualiza".to_string()),
-        
-        // Universal
-        "snap" => Some("📦 Snap (Universal)\ninstall | remove | refresh".to_string()),
-        "flatpak" => Some("📦 Flatpak (Universal)\ninstall | uninstall | update".to_string()),
-        
-        // Rede
-        "ping" => Some("🌐 Testa conexão\nping google.com".to_string()),
-        "curl" | "wget" => Some("🌐 Baixa da internet\ncurl/wget URL".to_string()),
-        "ssh" => Some("🌐 Acesso remoto\nssh user@host".to_string()),
-        
-        // Git
-        "git" => Some("📚 Controle de versão\nclone | pull | push | commit".to_string()),
-        
-        // Compressão
-        "tar" => Some("📦 Arquivamento\n-czf compacta | -xzf extrai".to_string()),
-        "zip" | "unzip" => Some("📦 Compressão ZIP\nzip arquivo.zip | unzip arquivo.zip".to_string()),
-        
-        // Systemd
-        "systemctl" => Some("⚙️ Gerencia serviços\nstart | stop | restart | status".to_string()),
-        
-        _ => None,
-    }
+fn get_command_hint(command: &str, app: &App) -> Option<String> {
+    app.i18n.command_hint(command)
 }
 
 /// Retorna comandos sugeridos baseados no nível do jogador
-fn get_level_commands(level: u32) -> Vec<(&'static str, &'static str)> {
-    if level < 5 {
-        // Nível 1-4: Iniciante - Comandos básicos
-        vec![
-            ("ls", "lista arquivos"),
-            ("cd", "muda diretório"),
-            ("pwd", "mostra local atual"),
-            ("mkdir", "cria pasta"),
-            ("touch", "cria arquivo"),
-        ]
-    } else if level < 10 {
-        // Nível 5-9: Aprendiz - Manipulação de arquivos
-        vec![
-            ("cat", "mostra conteúdo"),
-            ("cp", "copia arquivos"),
-            ("mv", "move/renomeia"),
-            ("rm", "remove (cuidado!)"),
-            ("grep", "busca em texto"),
-        ]
-    } else if level < 20 {
-        // Nível 10-19: Terminal - Comandos intermediários
-        vec![
-            ("nano", "editor de texto"),
-            ("find", "busca arquivos"),
-            ("chmod", "muda permissões"),
-            ("tar", "compacta/extrai"),
-            ("ps", "lista processos"),
-        ]
-    } else if level < 30 {
-        // Nível 20-29: Hacker - Rede e sistema
-        vec![
-            ("ssh", "acesso remoto"),
-            ("git", "versionamento"),
-            ("curl", "requisições HTTP"),
-            ("netstat", "conexões de rede"),
-            ("systemctl", "gerencia serviços"),
-        ]
-    } else if level < 40 {
-        // Nível 30-39: Cyberpunk - Package managers
-        vec![
-            ("pacman -Syu", "atualiza sistema"),
-            ("yay -S", "instala do AUR"),
-            ("apt update", "atualiza repos"),
-            ("dnf install", "instala pacote"),
-            ("docker", "containers"),
-        ]
-    } else {
-        // Nível 40+: Elite/Legend - Avançado
-        vec![
-            ("sudo su", "super usuário"),
-            ("fdisk", "partições"),
-            ("iptables", "firewall"),
-            ("cron", "tarefas agendadas"),
-            ("make", "compilação"),
-        ]
-    }
+fn get_level_commands(level: u32, app: &App) -> Vec<(&'static str, String)> {
+    app.i18n.level_commands(level)
 }
 
 /// Renderiza dica compacta
@@ -567,15 +478,16 @@ fn render_welcome_screen(frame: &mut Frame, app: &App, area: Rect) {
     
     let theme = app.game_state.get_theme();
     let level = app.game_state.level;
-    let rank = app.game_state.get_rank();
-    let message = Theme::get_level_message(level);
-    let character_lines = Theme::get_character_art(level);
+    let rank = app.game_state.get_rank(&app.i18n);
+    let message = app.i18n.level_message(level);
+    let character_lines = Theme::get_character_art(level, &app.i18n);
     
     let title = format!(" Munux - {} [Nv {}] ", rank, level);
     let block = Block::default()
         .borders(Borders::ALL)
         .title(title)
-        .border_style(Style::default().fg(theme.border));
+        .border_style(Style::default().fg(theme.border))
+        .style(Style::default().bg(Color::Black));
     
     let mut text = vec![Line::from("")];
     
@@ -593,7 +505,7 @@ fn render_welcome_screen(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                " Terminal Educacional Reativo",
+                format!(" {}", app.i18n.tc("ui-terminal-title")),
                 Style::default()
                     .fg(theme.accent)
                     .add_modifier(Modifier::BOLD),
@@ -619,20 +531,20 @@ fn render_welcome_screen(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                "O painel da direita muda conforme",
+                app.i18n.tc("ui-reactive-desc"),
                 Style::default().fg(theme.text),
             ),
         ]),
         Line::from(vec![
             Span::styled(
-                "você digita comandos!",
+                app.i18n.tc("ui-reactive-desc-2"),
                 Style::default().fg(theme.text),
             ),
         ]),
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                "Comandos para começar:",
+                format!("{}:", app.i18n.tc("ui-start-commands")),
                 Style::default().fg(theme.success).add_modifier(Modifier::BOLD),
             ),
         ]),
@@ -640,7 +552,7 @@ fn render_welcome_screen(frame: &mut Frame, app: &App, area: Rect) {
     ]);
     
     // Adiciona comandos dinâmicos baseados no nível
-    let commands = get_level_commands(level);
+    let commands = get_level_commands(level, app);
     for (cmd, desc) in commands {
         text.push(Line::from(vec![
             Span::styled(format!("  {}", cmd), Style::default().fg(theme.accent)),
@@ -682,6 +594,7 @@ fn render_command_help(
     description: &str,
     examples: &[String],
     tip: &str,
+    i18n: &crate::i18n::I18n,
     area: Rect,
 ) {
     let block = Block::default()
@@ -700,15 +613,11 @@ fn render_command_help(
             ),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled(
-                "Exemplos:",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
     ];
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled(format!("{}: ", i18n.tc("ui-examples")), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+    ]));
     
     for example in examples {
         lines.push(Line::from(vec![
@@ -719,6 +628,7 @@ fn render_command_help(
     
     lines.push(Line::from(""));
     lines.push(Line::from(vec![
+        Span::styled(format!("{}: ", i18n.tc("ui-tip")), Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
         Span::styled(tip, Style::default().fg(Color::Magenta)),
     ]));
     
@@ -730,10 +640,10 @@ fn render_command_help(
 }
 
 /// Renderiza easter egg
-fn render_easter_egg(frame: &mut Frame, content: &str, area: Rect) {
+fn render_easter_egg(frame: &mut Frame, content: &str, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .title(" 🥚 Easter Egg! ")
+        .title(format!(" 🥚 {} ", app.i18n.tc("ui-easter-egg")))
         .border_style(Style::default().fg(Color::Magenta));
     
     let paragraph = Paragraph::new(content)
@@ -745,18 +655,43 @@ fn render_easter_egg(frame: &mut Frame, content: &str, area: Rect) {
 }
 
 /// Renderiza painel de ajuda (help)
-fn render_help_panel(frame: &mut Frame, content: &str, title: &str, area: Rect) {
+fn render_help_panel(frame: &mut Frame, content: &str, title: &str, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(" 📚 {} ", title))
         .border_style(Style::default().fg(Color::Cyan))
-        .title_bottom(" ESC para voltar ");
+        .title_bottom(format!(" {} ", app.i18n.esc_to_back()));
     
     let paragraph = Paragraph::new(content)
         .block(block)
         .wrap(Wrap { trim: false })
         .style(Style::default().fg(Color::Gray))
         .scroll((0, 0)); // Futuramente pode adicionar scroll
+    
+    frame.render_widget(paragraph, area);
+}
+
+/// Renderiza output de comando com scroll
+fn render_command_output(frame: &mut Frame, content: &str, scroll: u16, app: &App, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title_bottom(format!(" {} ", app.i18n.scroll_hint()))
+        .border_style(Style::default().fg(Color::DarkGray)) // Borda discreta estilo terminal
+        .style(Style::default().bg(Color::Black)) 
+        .padding(ratatui::widgets::Padding::new(1, 1, 0, 0)); // Padding ajustado
+    
+    // Converte conteúdo com códigos ANSI para Text do Ratatui com cores preservadas
+    // Usando into_text() que lida internamente com ANSI se disponível ou Text::from(content)
+
+
+    use ansi_to_tui::IntoText;
+    // Usa ansi-to-tui para converter string com ANSI para Text do Ratatui
+    let text = content.into_text().unwrap_or_else(|_| ratatui::text::Text::from(content));
+    
+    let paragraph = Paragraph::new(text)
+        .block(block)
+        .wrap(Wrap { trim: false })
+        .scroll((scroll, 0));
     
     frame.render_widget(paragraph, area);
 }

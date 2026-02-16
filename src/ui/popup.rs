@@ -14,7 +14,7 @@ use ratatui::{
 /// Renderiza o popup flutuante (Ghost Mentor)
 pub fn render_popup(frame: &mut Frame, app: &App) {
     if let Some(popup) = &app.active_popup {
-        let area = frame.size();
+        let area = frame.area();
         let popup_area = layout::create_popup_layout(area, 60, 40);
         
         // Limpa a área do popup

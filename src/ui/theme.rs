@@ -102,6 +102,11 @@ impl Theme {
         }
     }
     
+    /// Retorna cor do background
+    pub fn get_background(&self) -> Color {
+        self.background
+    }
+
     /// Retorna a cor do cursor baseada no tema
     pub fn get_cursor_color(&self) -> Color {
         self.accent
@@ -119,104 +124,87 @@ impl Theme {
         }
     }
     
-    /// Retorna efeito visual do border baseado no nível
-    pub fn get_border_style(level: u32) -> &'static str {
+    /// Retorna estilo da borda baseado no nível
+    pub fn get_border_type(level: u32) -> ratatui::widgets::BorderType {
+        use ratatui::widgets::BorderType;
         match level {
-            1..=4 => "─",     // Simples
-            5..=9 => "═",     // Duplo
-            10..=19 => "━",   // Grosso
-            20..=29 => "┉",   // Tracejado
-            30..=49 => "╍",   // Pontilhado grosso
-            _ => "▬",         // Elite
+            1..=4 => BorderType::Plain,
+            5..=9 => BorderType::Rounded,
+            10..=19 => BorderType::Thick,
+            20..=29 => BorderType::Double,
+            30..=49 => BorderType::Thick, // Repetido pois não temos muitos tipos padrão
+            _ => BorderType::Thick,
         }
     }
     
     /// Retorna ASCII art do personagem baseado no nível
-    pub fn get_character_art(level: u32) -> Vec<&'static str> {
+    pub fn get_character_art(level: u32, i18n: &crate::i18n::I18n) -> Vec<String> {
         match level {
             // 1-4: Tux Iniciante
             1..=4 => vec![
-                "       .--.",
-                "      |o_o |",
-                "      |:_/ |",
-                "     //   \\ \\",
-                "    (|     | )",
-                "   /'\\_   _/`\\",
-                "   \\___)=(___/",
+                "       .--.".to_string(),
+                "      |o_o |".to_string(),
+                "      |:_/ |".to_string(),
+                "     //   \\ \\".to_string(),
+                "    (|     | )".to_string(),
+                "   /'\\_   _/`\\".to_string(),
+                "   \\___)=(___/".to_string(),
             ],
             
             // 5-9: Tux com Terminal
             5..=9 => vec![
-                "       .--.",
-                "      |>_< |  [TERMINAL MODE]",
-                "      |:_/ |",
-                "     //   \\ \\",
-                "    (|  █  | )",
-                "   /'\\_   _/`\\",
-                "   \\___)=(___/",
+                "       .--.".to_string(),
+                format!("      |>_< |  {}", i18n.art_tag("terminal")),
+                "      |:_/ |".to_string(),
+                "     //   \\ \\".to_string(),
+                "    (|  █  | )".to_string(),
+                "   /'\\_   _/`\\".to_string(),
+                "   \\___)=(___/".to_string(),
             ],
             
             // 10-19: Tux Hacker
             10..=19 => vec![
-                "       .--.",
-                "      |◉_◉ |  [HACKER MODE]",
-                "      |:_/ |",
-                "     //▓▓▓\\ \\",
-                "    (|  █  | )",
-                "   /'\\_▓▓▓_/`\\",
-                "   \\___)=(___/",
+                "       .--.".to_string(),
+                format!("      |◉_◉ |  {}", i18n.art_tag("hacker")),
+                "      |:_/ |".to_string(),
+                "     //▓▓▓\\ \\".to_string(),
+                "    (|  █  | )".to_string(),
+                "   /'\\_▓▓▓_/`\\".to_string(),
+                "   \\___)=(___/".to_string(),
             ],
             
             // 20-29: Tux Cyberpunk
             20..=29 => vec![
-                "    ▀▄▀▄.--.",
-                "    ▄▀▄|◉‿◉|  [CYBERPUNK]",
-                "      |:≈/ |",
-                "     //▓▓▓\\ \\",
-                "    (| ▓█▓ | )",
-                "   /'\\_▓▓▓_/`\\",
-                "   \\___)≡(___/",
+                "    ▀▄▀▄.--.".to_string(),
+                format!("    ▄▀▄|◉‿◉|  {}", i18n.art_tag("cyberpunk")),
+                "      |:≈/ |".to_string(),
+                "     //▓▓▓\\ \\".to_string(),
+                "    (| ▓█▓ | )".to_string(),
+                "   /'\\_▓▓▓_/`\\".to_string(),
+                "   \\___)≡(___/".to_string(),
             ],
             
             // 30-49: Tux Elite
             30..=49 => vec![
-                "  ▓▓▀▄▀▄.--.",
-                "  ▓▓▄▀▄|◉‿◉|  [ELITE HACKER]",
-                "  ▓▓  |:≈/ |",
-                "     //▓█▓\\ \\",
-                "    (| ▓█▓ | )▓",
-                "   /'\\_▓█▓_/`\\▓",
-                "   \\___)≡(___/",
+                "  ▓▓▀▄▀▄.--.".to_string(),
+                format!("  ▓▓▄▀▄|◉‿◉|  {}", i18n.art_tag("elite")),
+                "  ▓▓  |:≈/ |".to_string(),
+                "     //▓█▓\\ \\".to_string(),
+                "    (| ▓█▓ | )▓".to_string(),
+                "   /'\\_▓█▓_/`\\▓".to_string(),
+                "   \\___)≡(___/".to_string(),
             ],
             
             // 50+: Tux Legend
             _ => vec![
-                "  ▓▓▓▀▄▀▄.--.",
-                "  ▓▓▓▄▀▄|★‿★|  [LEGEND]",
-                "  ▓▓▓  |:≈/ |",
-                "  ▓  //▓█▓\\ \\  ▓",
-                "    (| ███ | )▓▓",
-                "   /'\\_███_/`\\▓",
-                "   \\___)≡(___/",
+                "  ▓▓▓▀▄▀▄.--.".to_string(),
+                format!("  ▓▓▓▄▀▄|★‿★|  {}", i18n.art_tag("legend")),
+                "  ▓▓▓  |:≈/ |".to_string(),
+                "  ▓  //▓█▓\\ \\  ▓".to_string(),
+                "    (| ███ | )▓▓".to_string(),
+                "   /'\\_███_/`\\▓".to_string(),
+                "   \\___)≡(___/".to_string(),
             ],
-        }
-    }
-    
-    /// Retorna mensagem motivacional baseada no nível
-    pub fn get_level_message(level: u32) -> &'static str {
-        match level {
-            1 => "Bem-vindo ao terminal!",
-            2..=4 => "Você está aprendendo!",
-            5 => "Modo de segurança DESATIVADO!",
-            6..=9 => "Comandos perigosos liberados",
-            10 => "Você é um hacker agora!",
-            11..=19 => "O sistema é seu playground",
-            20 => "Entrando no Cyberpunk...",
-            21..=29 => "Você domina o terminal",
-            30 => "Elite mode ACTIVATED!",
-            31..=49 => "Poucos chegam aqui...",
-            50 => "VOCÊ É UMA LENDA!",
-            _ => "All your base are belong to us",
         }
     }
 }
