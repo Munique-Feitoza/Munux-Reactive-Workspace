@@ -60,6 +60,7 @@ impl FileSystemManager {
     }
     
     /// Verifica se um caminho existe e é seguro
+    #[allow(dead_code)]
     pub fn is_safe_path(path: &Path) -> bool {
         path.exists() && !path.to_string_lossy().contains("..")
     }
@@ -81,6 +82,7 @@ impl FileSystemManager {
 
 /// Entrada de arquivo/diretório
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct FileEntry {
     pub name: String,
     pub path: PathBuf,

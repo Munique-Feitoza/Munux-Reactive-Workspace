@@ -91,6 +91,7 @@ impl Default for SystemMonitor {
 
 /// Informações de um processo
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ProcessInfo {
     pub pid: String,
     pub name: String,
@@ -100,6 +101,7 @@ pub struct ProcessInfo {
 
 /// Resumo do sistema
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SystemSummary {
     pub cpu_usage: f32,
     pub memory_used: u64,

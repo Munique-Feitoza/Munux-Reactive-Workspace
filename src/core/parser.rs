@@ -126,26 +126,25 @@ impl CommandParser {
         match cmd_type {
             CommandType::Dangerous => {
                 // Mensagens específicas por tipo de comando perigoso
-                let warning = if trimmed.contains("rm") && (trimmed.contains("-rf") || trimmed.contains("-fr")) {
-                    if trimmed.contains("/") && (trimmed.contains("/*") || trimmed.ends_with("/")) {
-                        "REMOÇÃO RECURSIVA EM DIRETÓRIO RAIZ!"
-                    } else {
-                        "Remoção recursiva e forçada de arquivos"
-                    }
-                } else if trimmed.contains("rm") {
-                    "Remoção de arquivo(s) - operação irreversível"
-                } else if trimmed.starts_with("sudo") {
-                    "Execução com privilégios de superusuário"
-                } else if trimmed.contains("dd") {
-                    "Cópia de baixo nível - pode sobrescrever dados"
-                } else if trimmed.contains("mkfs") || trimmed.contains("fdisk") || trimmed.contains("parted") {
-                    "Modificação de partições/sistema de arquivos"
-                } else if trimmed.contains("chmod") || trimmed.contains("chown") {
-                    "Modificação de permissões/propriedade de arquivos"
-                } else if trimmed.contains("reboot") || trimmed.contains("shutdown") || trimmed.contains("poweroff") {
-                    "Desligamento/reinicialização do sistema"
-                } else {
-                    "Comando potencialmente destrutivo detectado"
+                // Mensagens específicas por tipo de comando perigoso
+                let warning = match trimmed {
+                    t if t.contains("rm") && (t.contains("-rf") || t.contains("-fr")) => {
+                        if t.contains('/') && (t.contains("/*") || t.ends_with("/")) {
+                            "REMOÇÃO RECURSIVA EM DIRETÓRIO RAIZ!"
+                        } else {
+                            "Remoção recursiva e forçada de arquivos"
+                        }
+                    },
+                    t if t.contains("rm") => "Remoção de arquivo(s) - operação irreversível",
+                    t if t.starts_with("sudo") => "Execução com privilégios de superusuário",
+                    t if t.contains("dd") => "Cópia de baixo nível - pode sobrescrever dados",
+                    t if t.contains("mkfs") || t.contains("fdisk") || t.contains("parted") => 
+                        "Modificação de partições/sistema de arquivos",
+                    t if t.contains("chmod") || t.contains("chown") => 
+                        "Modificação de permissões/propriedade de arquivos",
+                    t if t.contains("reboot") || t.contains("shutdown") || t.contains("poweroff") => 
+                        "Desligamento/reinicialização do sistema",
+                    _ => "Comando potencialmente destrutivo detectado",
                 };
                 
                 RightPanelMode::DangerZone {

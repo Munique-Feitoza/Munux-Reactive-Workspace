@@ -27,6 +27,7 @@ impl ShellExecutor {
     }
     
     /// Verifica se um comando existe no PATH
+    #[allow(dead_code)]
     pub fn command_exists(command: &str) -> bool {
         if cfg!(target_os = "windows") {
             Command::new("where")
@@ -46,6 +47,7 @@ impl ShellExecutor {
 
 /// Resultado da execução de um comando
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CommandOutput {
     pub stdout: String,
     pub stderr: String,
