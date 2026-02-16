@@ -65,7 +65,7 @@ pub struct Achievement {
 
 impl GameState {
     /// Cria um novo estado de jogo
-    pub fn new() -> Self {
+    pub fn new(i18n: &crate::i18n::I18n) -> Self {
         Self {
             xp: 0,
             level: 1,
@@ -79,7 +79,7 @@ impl GameState {
             daily_streak: 1,
             command_streak: 0,
             last_achievement: None,
-            active_quests: crate::game::quests::generate_quests_for_level(1),
+            active_quests: crate::game::quests::generate_quests_for_level(1, i18n),
             successful_commands: 0,
             failed_commands: 0,
         }
@@ -126,6 +126,7 @@ impl GameState {
     }
     
     /// Adiciona uma conquista
+    #[allow(dead_code)]
     pub fn unlock_achievement(&mut self, id: String, name: String, description: String, xp_reward: u32) {
         // Verifica se já foi desbloqueada
         if self.achievements.iter().any(|a| a.id == id) {
@@ -145,18 +146,12 @@ impl GameState {
     }
     
     /// Retorna o título/rank baseado no nível
-    pub fn get_rank(&self) -> &str {
-        match self.level {
-            1..=9 => "🌱 Beginner",
-            10..=19 => "💻 Terminal",
-            20..=29 => "🔓 Hacker",
-            30..=39 => "🌃 Cyberpunk",
-            40..=49 => "👑 Elite",
-            _ => "⭐ Legend",
-        }
+    pub fn get_rank(&self, i18n: &crate::i18n::I18n) -> String {
+        i18n.rank_name(self.level)
     }
     
     /// Retorna a cor do nível (para o prompt)
+    #[allow(dead_code)]
     pub fn get_level_color(&self) -> ratatui::style::Color {
         use ratatui::style::Color;
         
@@ -201,12 +196,12 @@ impl GameState {
     }
     
     /// Gera novas quests quando sobe de nível
-    pub fn refresh_quests(&mut self) {
+    pub fn refresh_quests(&mut self, i18n: &crate::i18n::I18n) {
         // Remove quests completadas
         self.active_quests.retain(|q| !q.completed);
         
         // Adiciona novas quests para o nível atual
-        let new_quests = crate::game::quests::generate_quests_for_level(self.level);
+        let new_quests = crate::game::quests::generate_quests_for_level(self.level, i18n);
         for quest in new_quests {
             // Só adiciona se não existir uma quest com o mesmo ID
             if !self.active_quests.iter().any(|q| q.id == quest.id) {
@@ -218,6 +213,6 @@ impl GameState {
 
 impl Default for GameState {
     fn default() -> Self {
-        Self::new()
+        Self::new(&crate::i18n::I18n::new(crate::i18n::Language::PtBr))
     }
 }
