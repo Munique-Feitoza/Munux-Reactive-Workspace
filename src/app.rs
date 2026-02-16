@@ -3,6 +3,7 @@
 
 use crate::game::state::GameState;
 use anyhow::Result;
+use fluent::FluentArgs;
 use std::path::PathBuf;
 
 /// Enum que define os diferentes modos do Painel Direito (Reactive Panel)
@@ -57,6 +58,17 @@ pub enum RightPanelMode {
         content: String,
         title: String,
     },
+
+    /// Modo de ajuda específica de comando
+    CommandHelp {
+        command: String,
+        description: String,
+        examples: Vec<String>,
+        tip: String,
+    },
+    
+    /// Output genérico de comando
+    CommandOutput(String),
 }
 
 /// Estado da aplicação - "Single Source of Truth"
@@ -90,6 +102,15 @@ pub struct App {
     
     /// Popup ativo (Ghost Mentor)
     pub active_popup: Option<PopupMessage>,
+
+    /// Scroll vertical para o painel direito
+    pub scroll: u16,
+
+    /// Info do Git no diretório atual
+    pub git_status: Option<crate::core::git::GitStatus>,
+
+    /// Internacionalização
+    pub i18n: crate::i18n::I18n,
 }
 
 /// Mensagem de popup para o Ghost Mentor
@@ -113,17 +134,24 @@ impl App {
     pub fn new() -> Result<Self> {
         let current_dir = std::env::current_dir()?;
         
+        let git_status = crate::core::git::GitManager::get_status(&current_dir);
+        
+        let i18n = crate::i18n::I18n::new(crate::i18n::Language::detect());
+        
         Ok(Self {
             input_buffer: String::new(),
             command_history: Vec::new(),
             history_index: None,
             right_panel_mode: RightPanelMode::Welcome,
-            game_state: GameState::new(),
+            game_state: GameState::new(&i18n),
             current_dir,
             last_output: String::new(),
             should_quit: false,
             danger_mode_active: false,
             active_popup: None,
+            scroll: 0,
+            git_status,
+            i18n,
         })
     }
     
@@ -202,6 +230,20 @@ impl App {
         
         // Verifica se é comando perigoso ANTES de executar
         let cmd_type = CommandParser::classify_command(&command);
+        
+        // Verifica modo de segurança
+        if !CommandParser::is_safe_command(&command, self.game_state.safe_mode) {
+            self.last_output = self.i18n.tc("sys-access-denied");
+            // Mostra popup de aviso (usa PopupType::Warning)
+            self.show_popup(
+                self.i18n.tc("sys-access-denied-title"), 
+                self.i18n.tc("sys-access-denied-body"), 
+                PopupType::Warning
+            );
+            self.game_state.record_failure();
+            return Ok(());
+        }
+
         if matches!(cmd_type, crate::core::parser::CommandType::Dangerous) {
             self.game_state.damage_integrity(10);
         }
@@ -214,7 +256,7 @@ impl App {
             };
             
             // Checa achievement de easter egg
-            if let Some(achievement) = AchievementChecker::check_easter_egg(&mut self.game_state, &command) {
+            if let Some(achievement) = AchievementChecker::check_easter_egg(&mut self.game_state, &command, &self.i18n) {
                 self.game_state.last_achievement = Some(achievement.clone());
                 self.game_state.add_xp(achievement.xp_reward);
             }
@@ -236,8 +278,10 @@ impl App {
             return Ok(());
         } else if command == "achievements" {
             self.last_output = format!(
-                "🏆 Conquistas: {}/100\n\nÚltimas desbloqueadas:\n{}",
+                "{}: {}/100\n\n{}:\n{}",
+                self.i18n.tc("ui-achievements"),
                 self.game_state.achievements.len(),
+                self.i18n.tc("ui-last-unlocked"),
                 self.game_state.achievements
                     .iter()
                     .rev()
@@ -248,24 +292,44 @@ impl App {
             );
             self.input_buffer.clear();
             return Ok(());
+        } else if command == "tip" {
+            self.show_popup(
+                "💡 Dica do Dia".to_string(),
+                "Use o comando 'help' para listar todos os comandos disponíveis.\n\nExperimente 'stats' para ver seu progresso!".to_string(),
+                PopupType::Tip,
+            );
+            self.last_output = "Mostrando dica...".to_string();
+            self.input_buffer.clear();
+            return Ok(());
         } else if command.starts_with("help") {
             let args: Vec<&str> = command.split_whitespace().collect();
             if args.len() > 1 {
-                let distro = args[1].to_lowercase();
-                let content = crate::game::distro_guide::DistroGuide::get_guide(&distro);
-                let title = match distro.as_str() {
-                    "arch" => "Guia Manjaro/Arch Linux",
-                    "debian" => "Guia Ubuntu/Debian",
-                    "fedora" => "Guia Fedora/RHEL",
-                    "opensuse" => "Guia openSUSE",
-                    "linux" => "Guia Linux Universal",
-                    _ => "Guia de Ajuda",
-                };
+                let topic = args[1].to_lowercase();
+                
+                if let Some((cmd, desc, examples, tip)) = self.get_command_help(&topic) {
+                     self.right_panel_mode = RightPanelMode::CommandHelp {
+                        command: cmd,
+                        description: desc,
+                        examples: examples,
+                        tip: tip,
+                    };
+                    self.last_output = format!("📚 Ajuda do comando: {}", topic);
+                } else {
+                    let content = crate::game::distro_guide::DistroGuide::get_guide(&topic);
+                    let title = match topic.as_str() {
+                        "arch" => "Guia Manjaro/Arch Linux",
+                        "debian" => "Guia Ubuntu/Debian",
+                        "fedora" => "Guia Fedora/RHEL",
+                        "opensuse" => "Guia openSUSE",
+                        "linux" => "Guia Linux Universal",
+                        _ => "Guia de Ajuda",
+                    };
                 self.right_panel_mode = RightPanelMode::Help {
                     content,
                     title: title.to_string(),
                 };
                 self.last_output = format!("📚 Mostrando: {} (Pressione ESC para voltar)", title);
+                }
             } else {
                 self.right_panel_mode = RightPanelMode::Help {
                     content: r#"📚 MUNUX HELP SYSTEM
@@ -321,27 +385,29 @@ Pressione ESC para voltar ao modo normal.
         } else if command.starts_with("xp ") {
             // Comando secreto para testar progressão de nível
             if let Ok(amount) = command.trim_start_matches("xp ").trim().parse::<u32>() {
-                let old_level = self.game_state.level;
+                let _old_level = self.game_state.level;
                 let leveled_up = self.game_state.add_xp(amount);
                 if leveled_up {
                     self.last_output = format!(
-                        "✓ LEVEL UP! {} → {} | Você é agora: {} | {}",
-                        old_level,
+                        "{}: {} | {}: {} | XP: {} | {}",
+                        self.i18n.tc("ui-level"),
                         self.game_state.level,
-                        self.game_state.get_rank(),
-                        crate::ui::theme::Theme::get_level_message(self.game_state.level)
-                    );
-                    self.game_state.refresh_quests();
-                } else {
-                    self.last_output = format!("✓ +{} XP | {}/{} até o nível {}", 
-                        amount,
+                        self.i18n.tc("ui-rank"),
+                        self.game_state.get_rank(&self.i18n),
                         self.game_state.xp,
-                        self.game_state.xp_to_next_level,
-                        self.game_state.level + 1
+                        self.i18n.level_message(self.game_state.level)
                     );
+                    self.game_state.refresh_quests(&self.i18n);
+                } else {
+                    let mut args = FluentArgs::new();
+                    args.set("amount", amount);
+                    args.set("current", self.game_state.xp);
+                    args.set("total", self.game_state.xp_to_next_level);
+                    args.set("next", self.game_state.level + 1);
+                    self.last_output = self.i18n.t("sys-xp-gain", Some(&args));
                 }
             } else {
-                self.last_output = "✗ Uso: xp <quantidade>".to_string();
+                self.last_output = self.i18n.tc("sys-xp-usage");
             }
         } else if command == "exit" || command == "quit" {
             self.should_quit = true;
@@ -355,23 +421,20 @@ Pressione ESC para voltar ao modo normal.
             };
             
             // Sistema de XP dinâmico
-            let xp_reward = logic::calculate_xp_reward(&command, true);
+            let xp_reward = logic::calculate_xp_reward(&command, &cmd_type, true);
             self.game_state.add_xp(xp_reward);
             self.game_state.increment_commands();
             self.game_state.record_success();
             
-            // Verifica conquistas
-            if let Some((id, name, desc, xp)) = logic::check_achievements(&command, self.game_state.total_commands) {
-                if !self.game_state.has_achievement(id) {
-                    self.game_state.unlock_achievement(id.to_string(), name.to_string(), desc.to_string(), xp);
-                    self.show_achievement_popup(name, desc);
-                }
-            }
+            // Verifica conquistas (Removido daqui pois já é checado no final do execute_command via AchievementChecker)
         } else {
             // Executa comandos externos via shell
             use crate::core::shell::ShellExecutor;
             
-            match ShellExecutor::execute(&command, &self.current_dir) {
+            // Injeta flags de cor para comandos comuns se não estiverem presentes
+            let color_command = Self::prepare_color_command(&command);
+            
+            match ShellExecutor::execute(&color_command, &self.current_dir) {
                 Ok(output) => {
                     // Adiciona dicas educativas para erros comuns
                     let helpful_output = if !output.success {
@@ -381,22 +444,26 @@ Pressione ESC para voltar ao modo normal.
                     };
                     
                     self.last_output = if output.success {
-                        // Para comandos de listagem, formata melhor a saída
-                        if command.starts_with("ls") {
-                            let formatted = output.combined_output()
-                                .split_whitespace()
-                                .collect::<Vec<_>>()
-                                .join("\n  ");
-                            format!("✓ Arquivos e diretórios:\n\n  {}", formatted)
-                        } else {
-                            format!("✓ Comando executado:\n{}", helpful_output)
-                        }
+                        "✓ Comando executado com sucesso".to_string()
                     } else {
-                        format!("✗ Erro na execução:\n{}", helpful_output)
+                        "✗ Erro na execução do comando".to_string()
                     };
                     
+                    // Define o conteúdo do painel direito com o output do comando com um prompt estilizado
+                    let display_output = {
+                        use crate::ui::theme::Theme;
+                        let symbol = Theme::get_prompt_symbol(self.game_state.level);
+                        let rank = self.game_state.get_rank(&self.i18n);
+                        // Prompt verde neon com o comando em ciano brilhante (ANSI)
+                        let prompt = format!("\x1b[1;32m{} [{}@munux]$ \x1b[0m\x1b[1;36m{}\x1b[0m", symbol, rank, command);
+                        format!("{}\n{}", prompt, Self::sanitize_output(&helpful_output))
+                    };
+                    
+                    self.right_panel_mode = RightPanelMode::CommandOutput(display_output);
+                    self.scroll = 0; // Reset scroll
+                    
                     // Sistema de XP dinâmico baseado no comando
-                    let xp_reward = logic::calculate_xp_reward(&command, output.success);
+                    let xp_reward = logic::calculate_xp_reward(&command, &cmd_type, output.success);
                     if output.success {
                         let old_level = self.game_state.level;
                         let leveled_up = self.game_state.add_xp(xp_reward);
@@ -407,16 +474,20 @@ Pressione ESC para voltar ao modo normal.
                         // Notificação de Level Up
                         if leveled_up {
                             self.show_level_up_popup(old_level, self.game_state.level);
-                            self.game_state.refresh_quests();
+                            self.game_state.refresh_quests(&self.i18n);
+                            
+                            // Muda para painel de gamificação
+                            self.right_panel_mode = RightPanelMode::Gamification {
+                                message: {
+                                    let mut args = fluent::FluentArgs::new();
+                                    args.set("level", fluent::FluentValue::from(self.game_state.level));
+                                    self.i18n.t("sys-level-up-msg", Some(&args))
+                                },
+                                celebration: true,
+                            };
                         }
                         
-                        // Verifica conquistas
-                        if let Some((id, name, desc, xp)) = logic::check_achievements(&command, self.game_state.total_commands) {
-                            if !self.game_state.has_achievement(id) {
-                                self.game_state.unlock_achievement(id.to_string(), name.to_string(), desc.to_string(), xp);
-                                self.show_achievement_popup(name, desc);
-                            }
-                        }
+                        // Verifica conquistas (Removido daqui pois já é checado no final do execute_command via AchievementChecker)
                     } else {
                         self.game_state.increment_commands();
                         self.game_state.record_failure();
@@ -445,9 +516,13 @@ Pressione ESC para voltar ao modo normal.
             &mut self.game_state,
             &command,
             !self.last_output.starts_with("✗"),
+            &self.i18n,
         ) {
             self.game_state.last_achievement = Some(achievement.clone());
             self.game_state.add_xp(achievement.xp_reward);
+            
+            // Mostra popup
+            self.show_achievement_popup(&achievement.name, &achievement.description);
             
             // Mostra notificação de achievement
             let achievement_msg = format!(
@@ -460,9 +535,19 @@ Pressione ESC para voltar ao modo normal.
         }
         
         // Verifica achievement de streak
-        if let Some(streak_achievement) = AchievementChecker::check_streak(&mut self.game_state) {
+        if let Some(streak_achievement) = AchievementChecker::check_streak(&mut self.game_state, &self.i18n) {
             self.game_state.last_achievement = Some(streak_achievement.clone());
             self.game_state.add_xp(streak_achievement.xp_reward);
+            // Mostra popup para streak
+            self.show_achievement_popup(&streak_achievement.name, &streak_achievement.description);
+        }
+
+        // Verifica achievement de nível
+        if let Some(level_achievement) = AchievementChecker::check_level(&mut self.game_state, &self.i18n) {
+            self.game_state.last_achievement = Some(level_achievement.clone());
+            self.game_state.add_xp(level_achievement.xp_reward);
+            // Mostra popup para nível
+            self.show_achievement_popup(&level_achievement.name, &level_achievement.description);
         }
         
         // Atualiza progresso das quests
@@ -499,8 +584,15 @@ Pressione ESC para voltar ao modo normal.
         };
         
         if new_path.exists() && new_path.is_dir() {
-            self.current_dir = new_path.clone();
-            self.right_panel_mode = RightPanelMode::FileTree { path: new_path };
+            // Tenta canonicalizar o caminho para resolver .. e .
+            if let Ok(canon_path) = std::fs::canonicalize(&new_path) {
+                self.current_dir = canon_path.clone();
+                self.right_panel_mode = RightPanelMode::FileTree { path: canon_path };
+            } else {
+                // Fallback se falhar
+                self.current_dir = new_path.clone();
+                self.right_panel_mode = RightPanelMode::FileTree { path: new_path };
+            }
             Ok(())
         } else {
             anyhow::bail!("Diretório não encontrado: {}", path)
@@ -514,7 +606,10 @@ Pressione ESC para voltar ao modo normal.
         let input = self.input_buffer.trim();
         
         if input.is_empty() {
-            self.right_panel_mode = RightPanelMode::Welcome;
+            // Se o input estiver vazio, só volta para Welcome se NÂO estiver mostrando output de comando
+            if !matches!(self.right_panel_mode, RightPanelMode::CommandOutput(_)) {
+                self.right_panel_mode = RightPanelMode::Welcome;
+            }
             self.danger_mode_active = false;
             return;
         }
@@ -603,8 +698,8 @@ Pressione ESC para voltar ao modo normal.
     
     /// Mostra popup de Level Up
     fn show_level_up_popup(&mut self, old_level: u32, new_level: u32) {
-        let rank = self.game_state.get_rank();
-        let message = crate::ui::theme::Theme::get_level_message(new_level);
+        let rank = self.game_state.get_rank(&self.i18n);
+        let message = self.i18n.level_message(new_level);
         self.show_popup(
             "🎉 LEVEL UP!".to_string(),
             format!(
@@ -616,6 +711,7 @@ Pressione ESC para voltar ao modo normal.
     }
     
     /// Mostra popup de conquista desbloqueada
+    #[allow(dead_code)]
     fn show_achievement_popup(&mut self, name: &str, description: &str) {
         self.show_popup(
             "🏆 Conquista Desbloqueada!".to_string(),
@@ -659,6 +755,107 @@ Pressione ESC para voltar ao modo normal.
         }
         
         output
+    }
+    /// Retorna dados estruturados de ajuda para um comando
+    fn get_command_help(&self, command: &str) -> Option<(String, String, Vec<String>, String)> {
+        match command {
+            "ls" => Some((
+                "ls".to_string(),
+                self.i18n.tc("help-ls-desc"),
+                vec!["ls".to_string(), "ls -la".to_string(), "ls /home".to_string()],
+                self.i18n.tc("help-ls-hint")
+            )),
+            "cd" => Some((
+                "cd".to_string(),
+                self.i18n.tc("help-cd-desc"),
+                vec!["cd Documentos".to_string(), "cd ..".to_string(), "cd ~".to_string()],
+                self.i18n.tc("help-cd-hint")
+            )),
+             "grep" => Some((
+                "grep".to_string(),
+                self.i18n.tc("help-grep-desc"),
+                vec!["grep 'texto' arquivo.txt".to_string(), "cat arquivo | grep 'erro'".to_string()],
+                self.i18n.tc("help-grep-hint")
+            )),
+            "cat" => Some((
+                "cat".to_string(),
+                self.i18n.tc("help-cat-desc"),
+                vec!["cat arquivo.txt".to_string()],
+                self.i18n.tc("help-cat-hint")
+            )),
+            "sudo" => Some((
+                "sudo".to_string(),
+                self.i18n.tc("help-sudo-desc"),
+                vec!["sudo pacman -Syu".to_string(), "sudo reboot".to_string()],
+                self.i18n.tc("help-sudo-hint")
+            )),
+            _ => None
+        }
+    }
+    
+    /// Limpa e sanitiza o output para evitar quebras no TUI
+    fn sanitize_output(content: &str) -> String {
+        content.replace('\t', "    ") // Expande tabs para espaços para evitar saltos de cursor bugados
+               .replace('\r', "")      // Remove carriage returns que podem causar sobreposição de texto
+    }
+
+    /// Injeta flags de cor para comandos comuns em ambientes sem TTY
+    fn prepare_color_command(command: &str) -> String {
+        let trimmed = command.trim();
+        if trimmed.is_empty() { return command.to_string(); }
+        
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        let cmd = parts[0];
+        
+        match cmd {
+            "git" => {
+                // Força cores no git: git -c color.ui=always <resto>
+                let mut new_parts = vec!["git", "-c", "color.ui=always"];
+                new_parts.extend_from_slice(&parts[1..]);
+                new_parts.join(" ")
+            },
+            "ls" => {
+                // Força cores no ls (Linux)
+                if !trimmed.contains("--color") {
+                    format!("ls --color=always {}", &trimmed[2..].trim())
+                } else {
+                    trimmed.to_string()
+                }
+            },
+            "grep" => {
+                // Força cores no grep
+                if !trimmed.contains("--color") {
+                    format!("grep --color=always {}", &trimmed[4..].trim())
+                } else {
+                    trimmed.to_string()
+                }
+            },
+            "pacman" | "yay" => {
+                // Força cores no gerenciador de pacotes
+                if !trimmed.contains("--color") {
+                    format!("{} --color=always {}", cmd, &trimmed[cmd.len()..].trim())
+                } else {
+                    trimmed.to_owned()
+                }
+            },
+            "tree" => {
+                // Força cores no tree
+                if !trimmed.contains("-C") {
+                    format!("tree -C {}", &trimmed[4..].trim())
+                } else {
+                    trimmed.to_owned()
+                }
+            },
+            "ip" => {
+                // ip route, ip addr, etc
+                if !trimmed.contains("-c") && !trimmed.contains("-color") {
+                    format!("ip -c {}", &trimmed[2..].trim())
+                } else {
+                    trimmed.to_string()
+                }
+            },
+            _ => command.to_string()
+        }
     }
 }
 

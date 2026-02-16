@@ -7,6 +7,7 @@ mod tui;
 mod ui;
 mod core;
 mod game;
+mod i18n;
 
 use anyhow::Result;
 use app::App;
@@ -32,8 +33,8 @@ fn main() -> Result<()> {
     
     // Mensagem de boas-vindas
     app.show_popup(
-        "Bem-vindo ao Munux!".to_string(),
-        "Um terminal reativo e gamificado para aprender comandos Linux.\n\nUse as teclas normais para digitar.\nPressione Enter para executar.\nPressione Ctrl+C para sair.".to_string(),
+        app.i18n.welcome_title(),
+        app.i18n.tc("sys-welcome-body"),
         app::PopupType::Info,
     );
     
@@ -129,7 +130,8 @@ fn handle_event(app: &mut App, event: Event) -> Result<()> {
                         app::RightPanelMode::Help { .. } |
                         app::RightPanelMode::Stats |
                         app::RightPanelMode::Quests |
-                        app::RightPanelMode::EasterEgg { .. } => {
+                        app::RightPanelMode::EasterEgg { .. } |
+                        app::RightPanelMode::CommandOutput(_) => {
                             app.right_panel_mode = app::RightPanelMode::Welcome;
                             app.last_output = "Voltando ao modo normal".to_string();
                         }
@@ -137,6 +139,12 @@ fn handle_event(app: &mut App, event: Event) -> Result<()> {
                             app.clear_input();
                         }
                     }
+                }
+                KeyCode::PageUp => {
+                    app.scroll = app.scroll.saturating_sub(5);
+                }
+                KeyCode::PageDown => {
+                    app.scroll = app.scroll.saturating_add(5);
                 }
                 _ => {}
             }
@@ -149,9 +157,18 @@ fn handle_event(app: &mut App, event: Event) -> Result<()> {
         }
         Event::Resize(_, _) => {
             // O Ratatui lida com resize automaticamente
+            // Apenas re-renderiza no próximo loop
         }
-        Event::Mouse(_) => {
-            // Suporte a mouse pode ser adicionado no futuro
+        Event::Mouse(mouse_event) => {
+            match mouse_event.kind {
+                crossterm::event::MouseEventKind::ScrollDown => {
+                    app.scroll = app.scroll.saturating_add(1);
+                }
+                crossterm::event::MouseEventKind::ScrollUp => {
+                    app.scroll = app.scroll.saturating_sub(1);
+                }
+                _ => {}
+            }
         }
     }
     
