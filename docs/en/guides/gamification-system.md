@@ -28,6 +28,7 @@ $$\text{Total XP} = (\text{Base Command XP}) \times (\text{Streak Multiplier})$$
 | **File Ops** | `10 XP` | `mkdir`, `touch`, `cp` |
 | **Text Processing** | `15 XP` | `grep`, `sed`, `awk` |
 | **Git** | `25 XP` | `git commit`, `git push` |
+| **Git Sync** | `10 XP` | Refreshing ahead/behind status |
 | **Network** | `30 XP` | `ping`, `curl`, `ssh` |
 | **Admin** | `40 XP` | `systemctl`, `journalctl` |
 | **Package Mgr** | `50 XP` | `pacman`, `apt`, `dnf` |
@@ -55,6 +56,7 @@ $$\text{Total XP} = (\text{Base Command XP}) \times (\text{Streak Multiplier})$$
 ### Level Up Rewards
 
 Each tier grants:
+
 - 🎨 **New Theme** - Visual evolution of UI colors
 - 🐧 **Tux Evolution** - ASCII art transformation
 - ⚡ **Symbol Change** - Unique command prompt icon
@@ -67,6 +69,7 @@ Each tier grants:
 Achievements provide large bursts of XP and unique badges displayed in your profile.
 
 ### Category: Package Managers
+
 *Designed to encourage distro-agnostic learning.*
 
 | Badge | Title | Trigger | Reward |
@@ -78,6 +81,7 @@ Achievements provide large bursts of XP and unique badges displayed in your prof
 | 📦 | **Flatpak Explorer** | Use `flatpak` | `50 XP` |
 
 ### Category: First Steps
+
 *Fundamental CLI operations.*
 
 | Badge | Title | Trigger | Reward |
@@ -90,6 +94,7 @@ Achievements provide large bursts of XP and unique badges displayed in your prof
 | 🔐 | **Superuser** | First `sudo` command | `40 XP` |
 
 ### Category: Milestones
+
 *Long-term commitment tracking.*
 
 | Badge | Title | Trigger | Reward |
@@ -100,6 +105,7 @@ Achievements provide large bursts of XP and unique badges displayed in your prof
 | 👑 | **Terminal Master** | 500 commands executed | `500 XP` |
 
 ### Category: Streaks
+
 *Designed to build consistency.*
 
 | Badge | Title | Trigger | Reward |
@@ -145,6 +151,7 @@ graph LR
 | ⭐ **Legend** | "Master of all commands!" (No more quests - you are the master!) |
 
 **How it works:**
+
 1. The system monitors your command `history`
 2. When a quest criteria is met, a notification toast appears
 3. XP is awarded immediately
@@ -167,11 +174,13 @@ Streaks track consecutive successful commands (no errors).
 | 25+ | `2.0x` | 🔥🔥🔥 **GODLIKE** |
 
 **Streak Breaks:**
+
 - ❌ Command returns non-zero exit code
 - ❌ Syntax error in command
 - ❌ Permission denied error
 
 **Streak Safe Commands:**
+
 - ✅ `help` - Never breaks streak
 - ✅ `stats` - Safe to check progress
 - ✅ `cd` to non-existent dir - Forgiven (learning!)
@@ -192,6 +201,7 @@ Each level tier grants a unique visual theme.
 | ⭐ | **Legend Mode** | Rainbow | All | Dynamic RGB cycling |
 
 Themes affect:
+
 - Panel borders
 - Text highlighting
 - Tux ASCII art colors
@@ -205,6 +215,7 @@ Themes affect:
 $$\text{XP to Next Level} = 100 \times \text{Current Level}$$
 
 **Example:**
+
 - Level 1 → 2: 100 XP
 - Level 2 → 3: 200 XP
 - Level 5 → 6: 500 XP
@@ -235,6 +246,7 @@ quests
 ## Next Steps
 
 - 🎯 Try unlocking your first achievement!
+- 🐚 Master the [Git Integration](git-integration.md)
 - 🔥 Build a streak of 10+ commands
 - 📊 Use `stats` to track your progress
 - 🏆 Reach level 10 to unlock the Matrix theme

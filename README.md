@@ -8,10 +8,16 @@
 [![Framework](https://img.shields.io/badge/UI-Ratatui-blue?style=for-the-badge)](https://ratatui.rs/)
 [![License](https://img.shields.io/badge/License-GPLv3-red?style=for-the-badge)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Beta%20v0.1.0-green?style=for-the-badge)](https://github.com/Munique-Feitoza/Munux-Reactive-Workspace/releases)
-
 [![Made with Love](https://img.shields.io/badge/Made%20with-❤️%20and%20☕-ff69b4?style=for-the-badge)](https://github.com/Munique-Feitoza)
 [![Linux](https://img.shields.io/badge/Platform-Linux-yellow?style=for-the-badge&logo=linux)](https://www.linux.org/)
-[![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen?style=for-the-badge)](docs/contributing/code-of-conduct.md)
+[![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen?style=for-the-badge)](docs/en/contributing/code-of-conduct.md)
+
+---
+
+<p align="center">
+  <b>Select your language / Selecione seu idioma:</b><br>
+  🇺🇸 <b><a href="docs/en/README.md">English</a></b> | 🇧🇷 <b><a href="docs/pt-br/README.md">Português (Brasil)</a></b>
+</p>
 
 ---
 
@@ -33,11 +39,16 @@ cargo run
 ```
 
 **What you'll see:**
+
+<div align="left">
+
 - 🐧 Tux the penguin welcoming you
 - 📊 Real-time XP tracking
 - 🏆 Achievement unlocks
 - 🎯 Active quest system
 - 🎨 Beautiful cyberpunk themes
+
+</div>
 
 </div>
 
@@ -52,21 +63,21 @@ cargo run
 </div>
 
 ```text
-+---------------------------------+------------------------------+
-| FULL TERMINAL (60%)             | REACTIVE PANEL (40%)         |
-|                                 |                              |
-| ➜ [Beginner@munux]$             | 🐧 WELCOME TO MUNUX          |
-| pacman -Syu                     | 📊 STATS & PROGRESS          |
-|   ✓ System updated!             | ━━━━━━━━━━━━━━━━━━━━━━━━━    |
-| 🏆 Arch User - BTW, I use Arch! | Level 5 | XP: 450/500        |
-|                                 | Streak: 12 🔥                |
-| yay -S firefox                  | 📋 ACTIVE QUESTS             |
-|   ✓ Installing Firefox...       | ☑ First pacman (2/2)         |
-| +50 XP! 🎯 Quest complete!      | ☐ Git Explorer (0/5)         |
-|                                 | ☐ Network Master (1/10)      |
-+---------------------------------+------------------------------+
++---------------------------------+--------------------------------------+
+| FULL TERMINAL (60%)             | REACTIVE PANEL (40%)                 |
+|                                 |                                      |
+| ➜ [Beginner@munux]$             | 🐧 WELCOME TO MUNUX                  |
+| pacman -Syu                     | 📊 STATS & PROGRESS                  |
+|   ✓ System updated!             | ━━━━━━━━━━━━━━━━━━━━━━━━━            |
+| 🏆 Arch User - BTW, I use Arch! | Level 5 | XP: 450/500                |
+|                                 | Streak: 12 🔥                        |
+| yay -S firefox                  | 📋 ACTIVE QUESTS                     |
+|   ✓ Installing Firefox...       | ☑ First pacman (2/2)                |
+| +50 XP! 🎯 Quest complete!      | ☐ Git Explorer (0/5)                |
+|                                 | ☐ Network Master (1/10)             |
++---------------------------------+--------------------------------------+
 | [Lv 5 - Terminal] XP: 450/500 ▰▰▰▰▰▱▱▱ | 🏆 12 | 🔥 Streak: 12 |
-+---------------------------------+------------------------------+
++---------------------------------+--------------------------------------+
 ```
 
 ---
@@ -88,6 +99,7 @@ cargo run
 <td width="50%">
 
 **📦 Package Management**
+
 - `pacman`, `yay`, `paru` (Arch/Manjaro)
 - `apt`, `dpkg`, `snap` (Debian/Ubuntu)
 - `dnf`, `yum` (Fedora/RHEL)
@@ -95,11 +107,13 @@ cargo run
 - `flatpak` (Universal)
 
 **🌐 Network & Remote**
+
 - `ping`, `curl`, `wget`
 - `ssh`, `scp`, `rsync`
 - `netstat`, `ip`, `ifconfig`
 
 **🗜️ Compression & Archives**
+
 - `tar`, `zip`, `unzip`
 - `gzip`, `bzip2`, `xz`
 - `7z`, `rar`
@@ -108,18 +122,21 @@ cargo run
 <td width="50%">
 
 **⚙️ System Administration**
+
 - `systemctl`, `service`
 - `journalctl`, `dmesg`
 - `sudo`, `chmod`, `chown`
 - `ps`, `top`, `htop`, `kill`
 
 **💻 Development Tools**
+
 - `git`, `make`, `cmake`
 - `gcc`, `g++`, `clang`
 - `python`, `node`, `npm`
 - `cargo`, `rustc`
 
 **📝 Text Processing**
+
 - `sed`, `awk`, `grep`
 - `cat`, `less`, `more`
 - `vim`, `nano`, `emacs`
@@ -128,7 +145,19 @@ cargo run
 </tr>
 </table>
 
-### 2. 🎮 Complete Gamification System
+### 2. 🐚 Intelligent Git Prompt
+
+Munux features a professional-grade prompt that automatically adapts to your workspace:
+
+- **Repository Detection**: Instantly shows the repository name and current branch.
+- **File-Level Counters**:
+  - `+` (Green): Staged files ready for commit.
+  - `~` (Yellow): Modified files in the workspace.
+  - `?` (Red): Untracked files.
+- **Sync Status**: Real-time `↑` (ahead) and `↓` (behind) indicators to stay synced with GitHub.
+- **High Visibility**: Cyan, Magenta, and Green accents designed for maximum readability on any terminal background.
+
+### 3. 🎮 Complete Gamification System
 
 <div align="center">
 
@@ -152,6 +181,7 @@ cargo run
 <td width="50%">
 
 **🌟 First Steps**
+
 - ✅ First Command - "The Journey Begins"
 - ✅ First LS - "Listing Master"
 - ✅ First CD - "Navigator"
@@ -163,6 +193,7 @@ cargo run
 <td width="50%">
 
 **📦 Package Managers**
+
 - 🏔️ First Pacman - "Arch User - BTW!"
 - 📦 First APT - "Debian Disciple"
 - 🌿 First Git - "Version Control Initiate"
@@ -176,10 +207,12 @@ cargo run
 <td width="50%">
 
 **🎯 Milestones**
+
 - 🎯 10 Commands - "Getting Started"
 - 🚀 50 Commands - "Regular User"
 - 💎 100 Commands - "Power User"
 - 👑 500 Commands - "Terminal Master"
+
 </td>
 </tr>
 
@@ -187,8 +220,8 @@ cargo run
 <tr>
 <td width="50%">
 
-
 **🔥 Streaks**
+
 - 🔥 7-Day Streak - "Consistent"
 - 🔥 30-Day Streak - "Dedicated"
 - 🔥 100-Day Streak - "Unstoppable"
@@ -197,6 +230,7 @@ cargo run
 <td width="50%">
 
 **🚀 Special**
+
 - 🎯 Quest Master - Complete all quests
 - 🥚 Easter Egg Hunter - Find hidden commands
 - 🌈 Legend Status - Reach level 50
@@ -208,6 +242,7 @@ cargo run
 #### 🎯 Dynamic Quests
 
 Quests adapt to your level:
+
 - 🌱 **Beginner** (Lv 1-9): "Execute your first ls", "Create a file with touch"
 - 💻 **Terminal** (Lv 10-19): "Navigate to /home", "Install a package"
 - 🔓 **Hacker** (Lv 20-29): "Configure Git", "Use SSH to connect"
@@ -224,6 +259,7 @@ Quests adapt to your level:
 </table>
 
 ---
+
 ### 3. 🎯 Smart Reactive Panels
 
 The right panel changes automatically based on what you type:
@@ -240,6 +276,7 @@ The right panel changes automatically based on what you type:
 ### 4. 🥚 Easter Eggs (10+)
 
 Secret commands reveal surprises:
+
 - `sl` - Animated ASCII train
 - `cowsay` - Customizable talking cow
 - `fortune` - Quotes about Linux and programming
@@ -394,6 +431,7 @@ cargo build --release
 </div>
 
 ### ✅ Version 0.1.0 - COMPLETE
+
 - [x] Base architecture (The Elm Architecture)
 - [x] Reactive split screen
 - [x] XP and level system (6 tiers)
@@ -408,6 +446,7 @@ cargo build --release
 - [x] Evolutionary Tux (6 forms)  
 
 ### 🚧 Version 0.2.0 - In Planning
+
 - [ ] Progress persistence (save/load state)
 - [ ] Auto-complete (Tab completion)
 - [ ] Persistent history between sessions
@@ -418,31 +457,35 @@ cargo build --release
 - [ ] Benchmark mode (test typing speed)
 
 ### 🔮 Version 0.3.0 - Future
+
 - [ ] Customizable themes (create your own)
 - [ ] Plugins and extensions
 - [ ] Competitive mode (leaderboards)
-- [ ] GitHub integration (commits → XP)
+- [x] GitHub integration (commits/sync → XP) - **Implemented v0.1.1**
 - [ ] Multiplayer mode (compare progress)
+
 ---
 
 <div align="center">
 
 ## 📚 Documentation
 
-Complete documentation is available in the [`docs/`](docs/) directory:
+Detailed documentation is available in both **English** and **Portuguese**.
 
 </div>
 
-
 ### For Users
-- **[Quick Start Guide](docs/guides/quick-start.md)** - Get started in 5 minutes
+
+- **[Quick Start Guide](docs/en/guides/quick-start.md)** (EN) / **[Início Rápido](docs/pt-br/guides/quick-start.md)** (PT)
 - **[Installation Guide](docs/guides/installation.md)** - Detailed installation instructions
-- **[Gamification System](docs/guides/gamification-system.md)** - Understanding XP, achievements, and quests
-- **[Package Managers Guide](docs/guides/package-managers.md)** - Multi-distro package manager support
-- **[Troubleshooting](docs/guides/troubleshooting.md)** - Common issues and solutions
-- **[Testing Guide](docs/TESTING.md)** - Comprehensive testing documentation
+- **[Gamification System](docs/en/guides/gamification-system.md)** (EN) / **[Sistema de Gamificação](docs/pt-br/guides/gamification-system.md)** (PT)
+- **[Git Integration Guide](docs/en/guides/git-integration.md)** (EN) / **[Integração Git](docs/pt-br/guides/git-integration.md)** (PT)
+- **[Package Managers Guide](docs/en/guides/package-managers.md)** - Multi-distro package manager support
+- **[Troubleshooting](docs/en/guides/troubleshooting.md)** - Common issues and solutions
+- **[Testing Guide](docs/en/TESTING.md)** - Comprehensive testing documentation
 
 ### For Developers
+
 - **[Architecture Overview](docs/architecture/overview.md)** - High-level design
 - **[Component Breakdown](docs/architecture/)** - Detailed component documentation
 - **[Core Modules API](docs/api/core-modules.md)** - Technical API documentation
@@ -450,6 +493,7 @@ Complete documentation is available in the [`docs/`](docs/) directory:
 - **[Changelog](docs/CHANGELOG.md)** - Version history and updates
 
 ### For Contributors
+
 - **[Code of Conduct](docs/contributing/code-of-conduct.md)** - Community standards
 - **[Contributing Guide](docs/contributing/)** - How to contribute
 - **[Project Stats](docs/PROJECT_STATS.md)** - Project statistics and metrics
@@ -481,14 +525,15 @@ A: Level up! New themes are unlocked at levels 10, 20, 30, 40, and 50.
 
 *Created with passion for the Linux community*
 
-</div>
-
 **Munique Alves Pacheco Feitoza**
 
 [![GitHub](https://img.shields.io/badge/GitHub-Munique--Feitoza-181717?style=for-the-badge&logo=github)](https://github.com/Munique-Feitoza)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Munique%20Feitoza-0077B5?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/munique-feitoza)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Munique%20Feitoza-0077B5?style=for-the-badge&logo=linkedin)](https://www.linkedin.com/in/munique-feitoza-77034b231/)
+
+</div>
 
 ---
+
 <div align="center">
 
 ## 🙏 Acknowledgments
@@ -499,7 +544,6 @@ A: Level up! New themes are unlocked at levels 10, 20, 30, 40, and 50.
 - Ratatui: For the best TUI library in existence.
 - Arch/Manjaro Community: For the inspiration behind the package manager integration.
 - You: For using and contributing to Munux!
-
 
 <div align="center">
 
@@ -530,6 +574,5 @@ If you like this project, please consider:
 **Copyright © 2026 Munique Alves Pacheco Feitoza**
 
 Licensed under [GNU GPL v3.0](LICENSE) • [Report Bug](https://github.com/Munique-Feitoza/Munux-Reactive-Workspace/issues) • [Request Feature](https://github.com/Munique-Feitoza/Munux-Reactive-Workspace/issues)
-
 
 </div>
