@@ -17,6 +17,7 @@ ratatui = "0.28.1"
 crossterm = "0.27.0"
 tui-textarea = "0.6.0"
 ansi-to-tui = "6.0"
+ssh2 = "0.9"
 
 # System Info (Para o Monitor de CPU/RAM)
 sysinfo = "0.30.5"

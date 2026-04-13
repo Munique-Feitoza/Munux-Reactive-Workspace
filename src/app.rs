@@ -111,6 +111,9 @@ pub struct App {
 
     /// Internacionalização
     pub i18n: crate::i18n::I18n,
+
+    /// Sessão SSH ativa (se houver)
+    pub ssh_session: Option<crate::core::ssh::SshSession>,
 }
 
 /// Mensagem de popup para o Ghost Mentor
@@ -152,6 +155,7 @@ impl App {
             scroll: 0,
             git_status,
             i18n,
+            ssh_session: None,
         })
     }
     
@@ -227,8 +231,105 @@ impl App {
         self.history_index = None;
         
         let command = self.input_buffer.clone().trim().to_string();
-        
-        // Verifica se é comando perigoso ANTES de executar
+
+        // Lógica de Sessão SSH
+        if let Some(ssh_session) = &mut self.ssh_session {
+            // Comandos locais dentro da sessão SSH
+            if command == "exit" || command == "logout" {
+                self.ssh_session = None;
+                self.last_output = "🔌 Desconectado do servidor remoto.".to_string();
+                self.right_panel_mode = RightPanelMode::Welcome;
+                self.input_buffer.clear();
+                return Ok(());
+            }
+
+            // Comandos remotos
+            if command.starts_with("cd ") {
+                let path = command.trim_start_matches("cd ").trim();
+                match ssh_session.change_dir(path) {
+                    Ok(_) => {
+                        self.last_output = format!("✓ Diretório remoto alterado para: {}", ssh_session.remote_cwd);
+                        self.right_panel_mode = RightPanelMode::CommandOutput(self.last_output.clone());
+                    }
+                    Err(e) => {
+                        self.last_output = format!("✗ Erro: {}", e);
+                    }
+                }
+            } else {
+                // Executa qualquer outro comando no servidor
+                // Injeta --color=always para ls e grep se não tiver
+                let cmd_to_run = if (command.starts_with("ls ") || command == "ls") && !command.contains("--color") {
+                    format!("ls --color=always {}", command.trim_start_matches("ls").trim())
+                } else if command.starts_with("grep ") && !command.contains("--color") {
+                    format!("grep --color=always {}", command.trim_start_matches("grep").trim())
+                } else {
+                    command.clone()
+                };
+
+                match ssh_session.execute(&cmd_to_run) {
+                    Ok((stdout, stderr, _code)) => {
+                        let output = if !stdout.is_empty() { stdout } else { stderr };
+                        
+                        // Formata o output com prompt remoto
+                        let prompt = format!(
+                            "\x1b[1;36m{}@{} \x1b[0m\x1b[1;33m{}\x1b[0m$ \x1b[1m{}\x1b[0m", 
+                            ssh_session.user, ssh_session.host, ssh_session.remote_cwd, command
+                        );
+                        
+                        self.last_output = Self::sanitize_output(&output);
+                        self.right_panel_mode = RightPanelMode::CommandOutput(format!("{}\n{}", prompt, self.last_output));
+                    }
+                    Err(e) => {
+                        self.last_output = format!("✗ Erro de execução remota: {}", e);
+                    }
+                }
+            }
+
+            self.input_buffer.clear();
+            return Ok(());
+        }
+
+        // Comando para iniciar conexão SSH
+        if command.starts_with("ssh ") {
+            let parts: Vec<&str> = command.split_whitespace().collect();
+            if parts.len() >= 2 {
+                let target = parts[1]; // user@host
+                if target.contains('@') {
+                    let auth_parts: Vec<&str> = target.split('@').collect();
+                    let user = auth_parts[0];
+                    let host = auth_parts[1];
+                    
+                    self.last_output = format!("🔄 Conectando a {}@{}...", user, host);
+                    // Renderiza um frame antes de bloquear na conexão (idealmente seria async, mas TUI é sync)
+                    // Como não temos async runtime fácil aqui, vai bloquear brevemente
+                    
+                    match crate::core::ssh::SshSession::connect(user, host) {
+                        Ok(session) => {
+                            let cwd = session.remote_cwd.clone();
+                            self.ssh_session = Some(session);
+                            self.last_output = format!("✓ Conectado a {} em {}", host, cwd);
+                            self.right_panel_mode = RightPanelMode::Welcome; // Ou algum modo específico SSH
+                            
+                            self.show_popup(
+                                "Conexão Estabelecida".to_string(),
+                                format!("Conectado com sucesso a {}@{}\n\nDiretório: {}", user, host, cwd),
+                                PopupType::Success
+                            );
+                        }
+                        Err(e) => {
+                             self.last_output = format!("✗ Falha na conexão: {}", e);
+                             self.show_popup(
+                                "Erro de Conexão".to_string(),
+                                format!("Não foi possível conectar a {}:\n{}", target, e),
+                                PopupType::Warning
+                            );
+                        }
+                    }
+                    self.input_buffer.clear();
+                    return Ok(());
+                }
+            }
+        }
         let cmd_type = CommandParser::classify_command(&command);
         
         // Verifica modo de segurança
@@ -605,6 +706,11 @@ Pressione ESC para voltar ao modo normal.
         
         let input = self.input_buffer.trim();
         
+        if self.ssh_session.is_some() {
+            // Em modo SSH, desabilita a análise reativa de arquivos locais
+            return;
+        }
+
         if input.is_empty() {
             // Se o input estiver vazio, só volta para Welcome se NÂO estiver mostrando output de comando
             if !matches!(self.right_panel_mode, RightPanelMode::CommandOutput(_)) {

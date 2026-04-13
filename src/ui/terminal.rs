@@ -20,10 +20,18 @@ pub fn render_terminal_panel(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(Theme::get_border_type(app.game_state.level))
-        .title(format!(" {} - {} ", app.i18n.tc("ui-terminal-active"), app.current_dir.display()))
+        .borders(Borders::ALL)
+        .border_type(Theme::get_border_type(app.game_state.level))
+        .title(if let Some(ssh) = &app.ssh_session {
+            format!(" 🌐 SSH ACTIVE: {}@{} ", ssh.user, ssh.host)
+        } else {
+            format!(" {} - {} ", app.i18n.tc("ui-terminal-active"), app.current_dir.display())
+        })
         .border_style(Style::default().fg(
             if app.danger_mode_active {
                 theme.danger
+            } else if app.ssh_session.is_some() {
+                Color::Cyan
             } else {
                 theme.border
             }
@@ -92,39 +100,52 @@ pub fn render_terminal_panel(frame: &mut Frame, app: &App, area: Rect) {
     }
     
     // Linha de input atual com syntax highlighting e Git status
-    let mut input_spans = vec![
-        Span::styled(format!("{} [{}@munux]", symbol, rank), Style::default().fg(theme.primary).add_modifier(Modifier::BOLD)),
-    ];
+    // Linha de input atual
+    let mut input_spans = if let Some(ssh) = &app.ssh_session {
+        vec![
+            Span::styled("🌐 ", Style::default().fg(Color::Cyan)),
+            Span::styled(format!("{}@{}", ssh.user, ssh.host), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(":", Style::default().fg(Color::DarkGray)),
+            Span::styled(&ssh.remote_cwd, Style::default().fg(Color::Yellow)),
+            Span::styled("$ ", Style::default().fg(Color::Cyan)),
+        ]
+    } else {
+        vec![
+            Span::styled(format!("{} [{}@munux]", symbol, rank), Style::default().fg(theme.primary).add_modifier(Modifier::BOLD)),
+        ]
+    };
 
-    if let Some(git) = &app.git_status {
-        input_spans.push(Span::styled(" (", Style::default().fg(Color::DarkGray)));
-        input_spans.push(Span::styled(&git.repo_name, Style::default().fg(Color::LightBlue)));
-        input_spans.push(Span::styled(":", Style::default().fg(Color::DarkGray)));
-        input_spans.push(Span::styled(&git.branch, Style::default().fg(Color::LightMagenta)));
-        
-        // Adiciona indicadores de modificação
-        if git.staged > 0 {
-            input_spans.push(Span::styled(format!(" +{}", git.staged), Style::default().fg(theme.success)));
-        }
-        if git.modified > 0 {
-            input_spans.push(Span::styled(format!(" ~{}", git.modified), Style::default().fg(Color::Yellow)));
-        }
-        if git.untracked > 0 {
-            input_spans.push(Span::styled(format!(" ?{}", git.untracked), Style::default().fg(Color::Red)));
+    if app.ssh_session.is_none() {
+        if let Some(git) = &app.git_status {
+            input_spans.push(Span::styled(" (", Style::default().fg(Color::DarkGray)));
+            input_spans.push(Span::styled(&git.repo_name, Style::default().fg(Color::LightBlue)));
+            input_spans.push(Span::styled(":", Style::default().fg(Color::DarkGray)));
+            input_spans.push(Span::styled(&git.branch, Style::default().fg(Color::LightMagenta)));
+            
+            // Adiciona indicadores de modificação
+            if git.staged > 0 {
+                input_spans.push(Span::styled(format!(" +{}", git.staged), Style::default().fg(theme.success)));
+            }
+            if git.modified > 0 {
+                input_spans.push(Span::styled(format!(" ~{}", git.modified), Style::default().fg(Color::Yellow)));
+            }
+            if git.untracked > 0 {
+                input_spans.push(Span::styled(format!(" ?{}", git.untracked), Style::default().fg(Color::Red)));
+            }
+
+            // Adiciona indicadores de sync (ahead/behind)
+            if git.ahead > 0 {
+                input_spans.push(Span::styled(format!(" ↑{}", git.ahead), Style::default().fg(Color::Cyan)));
+            }
+            if git.behind > 0 {
+                input_spans.push(Span::styled(format!(" ↓{}", git.behind), Style::default().fg(Color::Red)));
+            }
+
+            input_spans.push(Span::styled(")", Style::default().fg(Color::DarkGray)));
         }
 
-        // Adiciona indicadores de sync (ahead/behind)
-        if git.ahead > 0 {
-            input_spans.push(Span::styled(format!(" ↑{}", git.ahead), Style::default().fg(Color::Cyan)));
-        }
-        if git.behind > 0 {
-            input_spans.push(Span::styled(format!(" ↓{}", git.behind), Style::default().fg(Color::Red)));
-        }
-
-        input_spans.push(Span::styled(")", Style::default().fg(Color::DarkGray)));
+        input_spans.push(Span::styled("$ ", Style::default().fg(theme.primary)));
     }
-
-    input_spans.push(Span::styled("$ ", Style::default().fg(theme.primary)));
     
     // Adiciona o input com cores baseadas em validação
     input_spans.extend(colorize_input(&app.input_buffer, &theme));

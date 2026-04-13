@@ -6,5 +6,6 @@ pub mod parser;
 pub mod filesystem;
 pub mod monitor;
 pub mod git;
+pub mod ssh;
 
 pub use monitor::SystemMonitor;
