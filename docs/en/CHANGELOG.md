@@ -10,6 +10,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### ✨ Added
+- **🌐 SSH Session Support** ([src/core/ssh.rs](../../src/core/ssh.rs)) — persistent remote shell via the `ssh2` crate.
+  - Auth chain: `ssh-agent` → `userauth_agent` → `~/.ssh/id_rsa` (no password prompt yet).
+  - Remote `cwd` tracking with dedicated `change_dir()` resolver.
+  - Cyan-bordered terminal panel + remote prompt `user@host cwd$` when a session is active.
+  - Auto-injected `--color=always` for `ls`/`grep` to preserve ANSI colors via `ansi-to-tui`.
+  - `exit`/`logout` drops the session and returns to the local shell.
+- **📚 Docs refresh** — architecture and API docs now include **colored UML diagrams** (class, state, sequence, flow) in both EN and PT-BR.
+
 ### Planned Features
 - [ ] Persistent state (save XP/achievements to disk)
 - [ ] Command history persistence across sessions

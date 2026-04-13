@@ -8,6 +8,19 @@ O formato é baseado no [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ---
 
+## [Não lançado]
+
+### ✨ Adicionado
+- **🌐 Suporte a Sessão SSH** ([src/core/ssh.rs](../../src/core/ssh.rs)) — shell remoto persistente via crate `ssh2`.
+  - Cadeia de auth: `ssh-agent` → `userauth_agent` → `~/.ssh/id_rsa` (sem prompt de senha ainda).
+  - Tracking de `cwd` remoto com `change_dir()` dedicado.
+  - Painel Terminal com borda ciano + prompt remoto `user@host cwd$` quando a sessão está ativa.
+  - Injeção automática de `--color=always` em `ls`/`grep` para preservar ANSI via `ansi-to-tui`.
+  - `exit`/`logout` encerra a sessão e volta ao shell local.
+- **📚 Docs atualizadas** — arquitetura e API agora incluem **diagramas UML coloridos** (classes, estados, sequência, fluxo) em EN e PT-BR.
+
+---
+
 ## [0.1.1] - 2026-02-16
 
 ### ✨ Adicionado

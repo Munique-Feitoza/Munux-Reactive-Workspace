@@ -13,28 +13,106 @@ Complete API documentation for Munux Reactive Workspace core components.
 
 ```mermaid
 graph TD
-    A[main.rs] --> B[app.rs]
-    A --> C[event.rs]
-    A --> D[tui.rs]
-    
-    B --> E[core/*]
-    B --> F[game/*]
-    B --> G[ui/*]
-    
-    E --> E1[parser.rs]
-    E --> E2[shell.rs]
-    E --> E3[filesystem.rs]
-    E --> E4[monitor.rs]
-    
-    F --> F1[state.rs]
-    F --> F2[logic.rs]
-    F --> F3[achievements.rs]
-    F --> F4[quests.rs]
-    
-    G --> G1[terminal.rs]
-    G --> G2[reactive.rs]
-    G --> G3[theme.rs]
-    G --> G4[hud.rs]
+    A[main.rs]:::entry --> B[app.rs]:::app
+    A --> C[event.rs]:::app
+    A --> D[tui.rs]:::app
+    A --> I[i18n.rs]:::app
+
+    B --> E[core/*]:::core
+    B --> F[game/*]:::game
+    B --> G[ui/*]:::ui
+
+    E --> E1[parser.rs]:::core
+    E --> E2[shell.rs]:::core
+    E --> E3[filesystem.rs]:::core
+    E --> E4[monitor.rs]:::core
+    E --> E5[git.rs]:::core
+    E --> E6[ssh.rs]:::ssh
+
+    F --> F1[state.rs]:::game
+    F --> F2[logic.rs]:::game
+    F --> F3[achievements.rs]:::game
+    F --> F4[quests.rs]:::game
+
+    G --> G1[terminal.rs]:::ui
+    G --> G2[reactive.rs]:::ui
+    G --> G3[theme.rs]:::ui
+    G --> G4[hud.rs]:::ui
+    G --> G5[stats.rs]:::ui
+    G --> G6[popup.rs]:::ui
+    G --> G7[layout.rs]:::ui
+
+    classDef entry fill:#ffd166,stroke:#d4a017,color:#000
+    classDef app fill:#b4a7f5,stroke:#6f42c1,color:#000
+    classDef core fill:#b8e994,stroke:#38a169,color:#000
+    classDef game fill:#f9a8d4,stroke:#be185d,color:#000
+    classDef ui fill:#a0e7e5,stroke:#17a2b8,color:#000
+    classDef ssh fill:#81d4fa,stroke:#0277bd,color:#000
+```
+
+### Cross-Module Class Diagram (UML)
+
+```mermaid
+classDiagram
+    direction TB
+
+    class App {
+        +String input_buffer
+        +PathBuf current_dir
+        +GameState game_state
+        +RightPanelMode right_panel_mode
+        +Option~SshSession~ ssh_session
+        +I18n i18n
+        +execute_command() Result
+        +handle_key(KeyEvent) Result
+        +analyze_input()
+    }
+
+    class CommandParser {
+        <<service>>
+        +classify_command(str)$ CommandType
+        +calculate_xp(CommandType)$ u32
+    }
+
+    class ShellExecutor {
+        <<service>>
+        +execute(str)$ Result~Output~
+    }
+
+    class SshSession {
+        +String host
+        +String user
+        +String remote_cwd
+        +connect(user, host)$ Result~SshSession~
+        +execute(cmd) Result
+        +change_dir(path) Result
+    }
+
+    class SystemMonitor {
+        +refresh()
+        +cpu_usage() f32
+        +memory_usage() MemoryInfo
+    }
+
+    class GameState
+    class Theme
+    class RightPanelMode {
+        <<enum>>
+        Welcome
+        CommandOutput
+        FileTree
+        DangerZone
+        Stats
+        SshActive
+    }
+
+    App *-- GameState
+    App *-- "0..1" SshSession
+    App --> RightPanelMode
+    App ..> CommandParser
+    App ..> ShellExecutor
+    App ..> SystemMonitor
+    GameState ..> Theme
 ```
 
 ---
@@ -285,6 +363,62 @@ pub struct MemoryInfo {
 - Refresh rate: Configurable (default 1s)
 - Memory footprint: ~2 MB
 - CPU overhead: <0.5%
+
+---
+
+### `ssh.rs` - Remote Shell Session
+
+Wraps the [`ssh2`](https://crates.io/crates/ssh2) crate to provide a persistent remote shell with cwd tracking.
+
+```rust
+pub struct SshSession {
+    session: ssh2::Session,
+    _tcp: TcpStream,
+    pub host: String,
+    pub user: String,
+    pub remote_cwd: String,
+}
+
+impl SshSession {
+    /// Open a TCP :22 connection + handshake + auth.
+    /// Auth order: ssh-agent → userauth_agent → ~/.ssh/id_rsa.
+    pub fn connect(user: &str, host: &str) -> Result<Self>;
+
+    /// Execute a command inside the tracked remote cwd.
+    /// Returns (stdout, stderr, exit_code).
+    pub fn execute(&mut self, command: &str) -> Result<(String, String, i32)>;
+
+    /// Update `remote_cwd` by resolving `cd $path && pwd` remotely.
+    pub fn change_dir(&mut self, path: &str) -> Result<()>;
+}
+```
+
+**Auth chain (colored UML):**
+
+```mermaid
+flowchart LR
+    A[connect]:::ok --> B{ssh-agent<br/>identities?}:::q
+    B -- yes --> OK([✅ Authenticated]):::ok
+    B -- no --> C{userauth_agent<br/>fallback?}:::q
+    C -- yes --> OK
+    C -- no --> D{~/.ssh/id_rsa<br/>exists?}:::q
+    D -- yes --> OK
+    D -- no --> FAIL([❌ bail!<br/>configure keys]):::bad
+
+    classDef ok fill:#b8e994,stroke:#38a169,color:#000
+    classDef q  fill:#ffd166,stroke:#d4a017,color:#000
+    classDef bad fill:#ff6b6b,stroke:#c0392b,color:#fff
+```
+
+> [!WARNING]
+> Password auth is **not** supported yet — this is intentional for RunCloud-style server targets. Use `ssh-agent` or a passphraseless `id_rsa`. Interactive password prompts require a TUI modal which is on the roadmap.
+
+**Behavior inside `App::execute_command()`** (see [app.rs:231-328](../../../src/app.rs#L231-L328)):
+- When `ssh_session.is_some()`, local parsing is bypassed.
+- `cd <path>` → `SshSession::change_dir`
+- `exit`/`logout` → drop session, return to local shell
+- Any other command → `SshSession::execute`, output rendered with a cyan-bordered remote prompt (`user@host cwd$ …`).
+- `ls`/`grep` are auto-injected with `--color=always` for ANSI rendering via `ansi-to-tui`.
 
 ---
 

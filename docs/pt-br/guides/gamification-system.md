@@ -20,6 +20,41 @@ O XP é calculado dinamicamente com base na complexidade da operação.
 
 $$\text{Total de XP} = (\text{XP Base do Comando}) \times (\text{Multiplicador de Streak})$$
 
+### Pipeline de XP (fluxo colorido)
+
+```mermaid
+flowchart LR
+    Cmd([Comando]):::in --> P{Parser<br/>classifica}:::core
+    P -->|Navegação| N[5 XP]:::low
+    P -->|Arquivos| F[10 XP]:::low
+    P -->|Texto| T[15 XP]:::mid
+    P -->|Git| G[25 XP]:::mid
+    P -->|Rede| Net[30 XP]:::mid
+    P -->|Admin| A[40 XP]:::high
+    P -->|Pacotes| Pk[50 XP]:::high
+    N --> M[× Multiplicador Streak]:::mult
+    F --> M
+    T --> M
+    G --> M
+    Net --> M
+    A --> M
+    Pk --> M
+    M --> AddXp[add_xp]:::core
+    AddXp --> Check{subiu nível?}:::q
+    Check -->|sim| LU[🎉 Level Up<br/>+ novo tema]:::win
+    Check -->|não| Done([Stats atualizadas]):::out
+
+    classDef in fill:#ffd166,stroke:#d4a017,color:#000
+    classDef out fill:#ffd166,stroke:#d4a017,color:#000
+    classDef core fill:#b4a7f5,stroke:#6f42c1,color:#000
+    classDef low fill:#d0f4de,stroke:#38a169,color:#000
+    classDef mid fill:#a0e7e5,stroke:#17a2b8,color:#000
+    classDef high fill:#f9a8d4,stroke:#be185d,color:#000
+    classDef mult fill:#ffadad,stroke:#c0392b,color:#000
+    classDef q fill:#fde68a,stroke:#d97706,color:#000
+    classDef win fill:#b8e994,stroke:#38a169,color:#000
+```
+
 ### Tabela de Valores de XP
 
 | Tipo de Comando | XP Base | Contexto |
@@ -50,6 +85,33 @@ $$\text{Total de XP} = (\text{XP Base do Comando}) \times (\text{Multiplicador d
 | **40-49** | 👑 **Elite** | Elite Purple | Docker e Containers |
 | **50+** | ⭐ **Lenda** | Rainbow/RGB | **Modo de Deus** |
 
+### Máquina de Estados de Patente
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Iniciante
+    Iniciante --> Terminal : nível ≥ 10
+    Terminal --> Hacker : nível ≥ 20
+    Hacker --> Cyberpunk : nível ≥ 30
+    Cyberpunk --> Elite : nível ≥ 40
+    Elite --> Lenda : nível ≥ 50
+    Lenda --> [*] : mestre 🏆
+
+    classDef beg fill:#a0e7e5,stroke:#17a2b8,color:#000
+    classDef term fill:#b8e994,stroke:#38a169,color:#000
+    classDef hack fill:#81d4fa,stroke:#0277bd,color:#000
+    classDef cyber fill:#f9a8d4,stroke:#be185d,color:#000
+    classDef elite fill:#b4a7f5,stroke:#6f42c1,color:#000
+    classDef leg fill:#ffd166,stroke:#d4a017,color:#000
+    class Iniciante beg
+    class Terminal term
+    class Hacker hack
+    class Cyberpunk cyber
+    class Elite elite
+    class Lenda leg
+```
+
 ---
 
 ## 🏅 Conquistas (Achievements)
@@ -78,6 +140,31 @@ As conquistas fornecem grandes bônus de XP e medalhas únicas exibidas em seu p
 ## ⚔️ Sistema de Missões (Quests)
 
 As missões são geradas processualmente com base no seu nível atual.
+
+```mermaid
+graph LR
+    A[Nível detectado]:::in --> B{Gera missões}:::core
+    B -->|Iniciante| C[Comandos básicos]:::beg
+    B -->|Terminal| D[Operações de arquivo]:::term
+    B -->|Hacker| E[Git & SSH]:::hack
+    B -->|Cyberpunk| F[Admin do sistema]:::cyber
+    B -->|Elite| G[Tarefas avançadas]:::elite
+    C --> H[Rastreia progresso]:::core
+    D --> H
+    E --> H
+    F --> H
+    G --> H
+    H -->|Completa| I([🏆 Concede XP]):::win
+
+    classDef in fill:#ffd166,stroke:#d4a017,color:#000
+    classDef core fill:#b4a7f5,stroke:#6f42c1,color:#000
+    classDef beg fill:#a0e7e5,stroke:#17a2b8,color:#000
+    classDef term fill:#b8e994,stroke:#38a169,color:#000
+    classDef hack fill:#81d4fa,stroke:#0277bd,color:#000
+    classDef cyber fill:#f9a8d4,stroke:#be185d,color:#000
+    classDef elite fill:#b4a7f5,stroke:#4c1d95,color:#fff
+    classDef win fill:#b8e994,stroke:#38a169,color:#000
+```
 
 ### Exemplos de Missões por Patente
 

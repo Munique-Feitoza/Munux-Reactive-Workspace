@@ -12,6 +12,60 @@ The prompt automatically detects if you are inside a Git repository (or any sub-
 
 ---
 
+## 🧭 Detection Pipeline
+
+```mermaid
+flowchart LR
+    A([cd / cmd executed]):::in --> B{Is this a<br/>git repo?}:::q
+    B -- no --> Plain[Plain prompt]:::out
+    B -- yes --> C[Resolve repo name]:::core
+    C --> D[Read HEAD → branch]:::core
+    D --> E[git status --porcelain]:::core
+    E --> F[Count +~?]:::core
+    F --> G[Compare upstream<br/>↑ahead ↓behind]:::core
+    G --> H([Render Git Segment]):::out
+
+    classDef in fill:#ffd166,stroke:#d4a017,color:#000
+    classDef out fill:#a0e7e5,stroke:#17a2b8,color:#000
+    classDef core fill:#b4a7f5,stroke:#6f42c1,color:#000
+    classDef q fill:#fde68a,stroke:#d97706,color:#000
+```
+
+---
+
+## 🚦 Repo State Machine
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Clean
+    Clean --> Modified : edit file
+    Modified --> Staged : git add
+    Staged --> Committed : git commit
+    Committed --> Ahead : local commits
+    Ahead --> Synced : git push
+    Synced --> Clean
+    Clean --> Behind : remote pushed
+    Behind --> Clean : git pull
+    Modified --> Untracked : new file
+    Untracked --> Staged : git add
+
+    classDef clean fill:#b8e994,stroke:#38a169,color:#000
+    classDef warn fill:#fde68a,stroke:#d97706,color:#000
+    classDef bad fill:#ff6b6b,stroke:#c0392b,color:#fff
+    classDef info fill:#81d4fa,stroke:#0277bd,color:#000
+    class Clean clean
+    class Synced clean
+    class Modified warn
+    class Staged warn
+    class Untracked bad
+    class Behind bad
+    class Ahead info
+    class Committed info
+```
+
+---
+
 ## 📊 Indicator Reference
 
 Each symbol and color in the Git segment has a specific meaning designed for quick scanning.

@@ -20,6 +20,41 @@ XP is calculated dynamically based on the complexity of the operation.
 
 $$\text{Total XP} = (\text{Base Command XP}) \times (\text{Streak Multiplier})$$
 
+### XP Pipeline (colored flow)
+
+```mermaid
+flowchart LR
+    Cmd([Command Input]):::in --> P{Parser<br/>classify}:::core
+    P -->|Navigation| N[5 XP]:::low
+    P -->|File Ops| F[10 XP]:::low
+    P -->|Text| T[15 XP]:::mid
+    P -->|Git| G[25 XP]:::mid
+    P -->|Network| Net[30 XP]:::mid
+    P -->|Admin| A[40 XP]:::high
+    P -->|Package| Pk[50 XP]:::high
+    N --> M[× Streak Multiplier]:::mult
+    F --> M
+    T --> M
+    G --> M
+    Net --> M
+    A --> M
+    Pk --> M
+    M --> AddXp[add_xp]:::core
+    AddXp --> Check{level up?}:::q
+    Check -->|yes| LU[🎉 Level Up<br/>+ new theme]:::win
+    Check -->|no| Done([Stats updated]):::out
+
+    classDef in fill:#ffd166,stroke:#d4a017,color:#000
+    classDef out fill:#ffd166,stroke:#d4a017,color:#000
+    classDef core fill:#b4a7f5,stroke:#6f42c1,color:#000
+    classDef low fill:#d0f4de,stroke:#38a169,color:#000
+    classDef mid fill:#a0e7e5,stroke:#17a2b8,color:#000
+    classDef high fill:#f9a8d4,stroke:#be185d,color:#000
+    classDef mult fill:#ffadad,stroke:#c0392b,color:#000
+    classDef q fill:#fde68a,stroke:#d97706,color:#000
+    classDef win fill:#b8e994,stroke:#38a169,color:#000
+```
+
 ### XP Values Table
 
 | Command Type | Base XP | Context |
@@ -52,6 +87,33 @@ $$\text{Total XP} = (\text{Base Command XP}) \times (\text{Streak Multiplier})$$
 | **30-39** | 🌃 **Cyberpunk** | Cyberpunk Magenta | Git & Networking |
 | **40-49** | 👑 **Elite** | Elite Purple | Docker & Containers |
 | **50+** | ⭐ **Legend** | Rainbow/RGB | **God Mode** |
+
+### Tier State Machine
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Beginner
+    Beginner --> Terminal : level ≥ 10
+    Terminal --> Hacker : level ≥ 20
+    Hacker --> Cyberpunk : level ≥ 30
+    Cyberpunk --> Elite : level ≥ 40
+    Elite --> Legend : level ≥ 50
+    Legend --> [*] : master 🏆
+
+    classDef beg fill:#a0e7e5,stroke:#17a2b8,color:#000
+    classDef term fill:#b8e994,stroke:#38a169,color:#000
+    classDef hack fill:#81d4fa,stroke:#0277bd,color:#000
+    classDef cyber fill:#f9a8d4,stroke:#be185d,color:#000
+    classDef elite fill:#b4a7f5,stroke:#6f42c1,color:#000
+    classDef leg fill:#ffd166,stroke:#d4a017,color:#000
+    class Beginner beg
+    class Terminal term
+    class Hacker hack
+    class Cyberpunk cyber
+    class Elite elite
+    class Legend leg
+```
 
 ### Level Up Rewards
 
@@ -125,18 +187,27 @@ Quests are procedurally generated missions based on your current level.
 
 ```mermaid
 graph LR
-    A[Level Detected] --> B{Generate Quests}
-    B -->|Beginner| C[Basic Commands]
-    B -->|Terminal| D[File Operations]
-    B -->|Hacker| E[Git & SSH]
-    B -->|Cyberpunk| F[System Admin]
-    B -->|Elite| G[Advanced Tasks]
-    C --> H[Track Progress]
+    A[Level Detected]:::in --> B{Generate Quests}:::core
+    B -->|Beginner| C[Basic Commands]:::beg
+    B -->|Terminal| D[File Operations]:::term
+    B -->|Hacker| E[Git & SSH]:::hack
+    B -->|Cyberpunk| F[System Admin]:::cyber
+    B -->|Elite| G[Advanced Tasks]:::elite
+    C --> H[Track Progress]:::core
     D --> H
     E --> H
     F --> H
     G --> H
-    H -->|Complete| I[Award XP]
+    H -->|Complete| I([🏆 Award XP]):::win
+
+    classDef in fill:#ffd166,stroke:#d4a017,color:#000
+    classDef core fill:#b4a7f5,stroke:#6f42c1,color:#000
+    classDef beg fill:#a0e7e5,stroke:#17a2b8,color:#000
+    classDef term fill:#b8e994,stroke:#38a169,color:#000
+    classDef hack fill:#81d4fa,stroke:#0277bd,color:#000
+    classDef cyber fill:#f9a8d4,stroke:#be185d,color:#000
+    classDef elite fill:#b4a7f5,stroke:#4c1d95,color:#fff
+    classDef win fill:#b8e994,stroke:#38a169,color:#000
 ```
 
 ### Quest Examples by Tier

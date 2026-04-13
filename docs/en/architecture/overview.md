@@ -13,41 +13,129 @@ Munux implements a **reactive split-panel architecture** based on **The Elm Arch
 
 ```mermaid
 graph TD
-    User((User)) --> Input[Terminal Input]
-    
-    subgraph UI_Layer [User Interface Layer]
-        Input --> LeftPanel[Terminal Panel 60%]
-        RightPanel[Reactive Panel 40%]
-        HUD[Heads Up Display]
+    User((User)):::userCls --> Input[Terminal Input]:::uiCls
+
+    subgraph UI_Layer [🎨 User Interface Layer]
+        Input --> LeftPanel[Terminal Panel 60%]:::uiCls
+        RightPanel[Reactive Panel 40%]:::uiCls
+        HUD[Heads Up Display]:::uiCls
     end
 
-    subgraph Core_Layer [Application Core]
-        EventLoop(Event Loop / Crossterm) --> Parser{Command Parser}
-        Parser -->|Navigation| NavState[Nav State]
-        Parser -->|System| SysState[System State]
-        Parser -->|Dangerous| DangerState[Danger State]
-        
-        StateMgr[State Management TEA]
+    subgraph Core_Layer [⚙️ Application Core - TEA]
+        EventLoop(Event Loop / Crossterm):::coreCls --> Parser{Command Parser}:::coreCls
+        Parser -->|Navigation| NavState[Nav State]:::coreCls
+        Parser -->|System| SysState[System State]:::coreCls
+        Parser -->|Dangerous| DangerState[Danger State]:::dangerCls
+        Parser -->|SSH| SshState[SSH State]:::sshCls
+
+        StateMgr[State Management TEA]:::coreCls
         NavState --> StateMgr
         SysState --> StateMgr
         DangerState --> StateMgr
-        
+        SshState --> StateMgr
+
         StateMgr -->|Update View| RightPanel
         StateMgr -->|Update Stats| HUD
     end
 
-    subgraph System_Layer [System Layer]
-        Shell[Shell Executor sh/bash]
-        FS[File System]
-        Monitor[SysInfo Monitor]
-        
+    subgraph System_Layer [💻 System Layer]
+        Shell[Shell Executor sh/bash]:::sysCls
+        FS[File System]:::sysCls
+        Monitor[SysInfo Monitor]:::sysCls
+        Git[Git Integration]:::sysCls
+
         StateMgr -->|Execute| Shell
         StateMgr -->|Read| FS
         StateMgr -->|Poll| Monitor
+        StateMgr -->|Status| Git
     end
 
-    Shell --> Output[Command Output]
+    subgraph Remote_Layer [🌐 Remote Layer]
+        SshSession[SSH Session ssh2]:::sshCls
+        RemoteHost[(Remote Host)]:::remoteCls
+        StateMgr -->|Tunnel| SshSession
+        SshSession -->|TCP :22| RemoteHost
+    end
+
+    Shell --> Output[Command Output]:::uiCls
+    SshSession --> Output
     Output --> LeftPanel
+
+    classDef userCls fill:#ffd166,stroke:#d4a017,stroke-width:2px,color:#1a1a1a
+    classDef uiCls fill:#a0e7e5,stroke:#17a2b8,stroke-width:2px,color:#1a1a1a
+    classDef coreCls fill:#b4a7f5,stroke:#6f42c1,stroke-width:2px,color:#1a1a1a
+    classDef sysCls fill:#b8e994,stroke:#38a169,stroke-width:2px,color:#1a1a1a
+    classDef sshCls fill:#81d4fa,stroke:#0277bd,stroke-width:2px,color:#1a1a1a
+    classDef remoteCls fill:#f8bbd0,stroke:#ad1457,stroke-width:2px,color:#1a1a1a
+    classDef dangerCls fill:#ff6b6b,stroke:#c0392b,stroke-width:2px,color:#fff
+```
+
+> [!TIP]
+> 🟨 User · 🟦 UI · 🟪 Core · 🟩 System · 🟦 SSH · 🟥 Danger — color-coded for fast scanning.
+
+---
+
+## Core Class Diagram (UML)
+
+```mermaid
+classDiagram
+    direction LR
+
+    class App {
+        +String input_buffer
+        +Vec~String~ history
+        +PathBuf current_dir
+        +GameState game_state
+        +RightPanelMode right_panel_mode
+        +Option~SshSession~ ssh_session
+        +I18n i18n
+        +new() Result~App~
+        +handle_key(KeyEvent) Result
+        +execute_command() Result
+        +analyze_input()
+    }
+
+    class CommandParser {
+        +classify_command(str) CommandType
+        +calculate_xp(CommandType) u32
+        +is_dangerous(str) bool
+    }
+
+    class ShellExecutor {
+        +execute(str) Result~Output~
+        +execute_in_dir(str, Path) Result
+    }
+
+    class SshSession {
+        +String host
+        +String user
+        +String remote_cwd
+        -Session session
+        -TcpStream _tcp
+        +connect(user, host) Result~SshSession~
+        +execute(cmd) Result~(String,String,i32)~
+        +change_dir(path) Result
+    }
+
+    class SystemMonitor {
+        +refresh()
+        +cpu_usage() f32
+        +memory_usage() MemoryInfo
+    }
+
+    class GameState {
+        +u32 level
+        +u32 xp
+        +Vec~Achievement~ achievements
+        +add_xp(u32) Option~LevelUpInfo~
+        +check_achievements() Vec
+    }
+
+    App "1" *-- "1" GameState : owns
+    App "1" *-- "0..1" SshSession : optional
+    App ..> CommandParser : uses
+    App ..> ShellExecutor : uses
+    App ..> SystemMonitor : uses
 ```
 
 ---
@@ -138,6 +226,67 @@ sequenceDiagram
 | **Theme System** | `ui/theme.rs` | Progressive themes (6 tiers: Beginner→Legend) |
 | **Stats Panel** | `ui/stats.rs` | Detailed statistics and quest tracking |
 | **Popup System** | `ui/popup.rs` | Achievement notifications, warnings |
+| **SSH Session** | `core/ssh.rs` | Remote shell via `ssh2` (agent / pubkey auth), remote cwd tracking |
+| **Git Integration** | `core/git.rs` | Repository branch/status detection |
+| **I18n** | `i18n.rs` | Runtime localization (EN / PT-BR) via Fluent |
+
+---
+
+## SSH Session Lifecycle (State Diagram)
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Connecting : user types<br/>`ssh user@host`
+    Connecting --> Authenticating : TCP :22 OK
+    Connecting --> Failed : TCP error
+    Authenticating --> Active : ssh-agent /<br/>pubkey OK
+    Authenticating --> Failed : auth error
+    Active --> Active : execute(cmd)<br/>change_dir(path)
+    Active --> Idle : user types<br/>`exit` / `logout`
+    Failed --> Idle : popup shown
+    Active --> [*] : App quits
+
+    classDef active fill:#81d4fa,stroke:#0277bd,color:#000
+    classDef bad fill:#ff6b6b,stroke:#c0392b,color:#fff
+    class Active active
+    class Failed bad
+```
+
+### SSH Command Flow (Sequence)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant App as App (app.rs)
+    participant Ssh as SshSession (core/ssh.rs)
+    participant Host as Remote Host
+
+    User->>App: ssh alice@box.dev
+    App->>Ssh: SshSession::connect("alice","box.dev")
+    Ssh->>Host: TCP connect :22
+    Ssh->>Host: SSH handshake
+    Ssh->>Host: userauth (agent → pubkey → ~/.ssh/id_rsa)
+    Host-->>Ssh: auth ok
+    Ssh->>Host: exec `pwd`
+    Host-->>Ssh: remote_cwd
+    Ssh-->>App: Ok(SshSession { host, user, remote_cwd })
+    App-->>User: 🟢 popup "Connection Established"
+
+    loop while ssh_session.is_some()
+        User->>App: remote command
+        App->>Ssh: execute(cmd)
+        Ssh->>Host: channel.exec(cd $cwd && $cmd)
+        Host-->>Ssh: stdout / stderr / exit_code
+        Ssh-->>App: output
+        App-->>User: render in Terminal Panel (cyan border)
+    end
+
+    User->>App: exit
+    App->>Ssh: drop session
+    App-->>User: 🔌 disconnected
+```
 
 ---
 
@@ -145,14 +294,23 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    A[User Input] --> B[Event Loop]
-    B --> C[Parser]
-    C --> D[State Update]
-    D --> E[Shell Execution]
-    E --> F[Capture Output]
-    F --> G[View Render]
-    G --> H[Display to User]
+    A([User Input]):::in --> B[Event Loop]:::core
+    B --> C{Parser}:::core
+    C --> D[State Update]:::core
+    D --> E[Shell Execution]:::sys
+    D --> S[SSH Execute]:::ssh
+    E --> F[Capture Output]:::sys
+    S --> F
+    F --> G[View Render]:::ui
+    G --> H([Display to User]):::out
     D -.->|Reactive| G
+
+    classDef in fill:#ffd166,stroke:#d4a017,color:#000
+    classDef out fill:#ffd166,stroke:#d4a017,color:#000
+    classDef core fill:#b4a7f5,stroke:#6f42c1,color:#000
+    classDef sys fill:#b8e994,stroke:#38a169,color:#000
+    classDef ssh fill:#81d4fa,stroke:#0277bd,color:#000
+    classDef ui fill:#a0e7e5,stroke:#17a2b8,color:#000
 ```
 
 **Step-by-step:**
@@ -210,9 +368,84 @@ flowchart LR
 - [ ] Command history across sessions (SQLite)
 - [ ] Cloud sync for multi-device progression
 
+#### Proposed Data Model (ER)
+
+> [!NOTE]
+> Not implemented yet. Sketch for the upcoming `~/.munux/state.json` (JSON) + `~/.munux/history.db` (SQLite) split.
+
+```mermaid
+erDiagram
+    PROFILE ||--o{ SESSION : "has"
+    PROFILE ||--o{ UNLOCKED_ACHIEVEMENT : "earned"
+    PROFILE ||--o{ ACTIVE_QUEST : "tracking"
+    PROFILE {
+        string id PK
+        string username
+        int level
+        int xp
+        int max_streak
+        datetime created_at
+        datetime last_seen_at
+    }
+    SESSION ||--o{ COMMAND : "contains"
+    SESSION {
+        string id PK
+        string profile_id FK
+        datetime started_at
+        datetime ended_at
+        int commands_run
+        int xp_earned
+    }
+    COMMAND {
+        int id PK
+        string session_id FK
+        string raw
+        string cmd_type
+        int exit_code
+        int xp_delta
+        int duration_ms
+        datetime executed_at
+    }
+    UNLOCKED_ACHIEVEMENT {
+        string achievement_id PK
+        string profile_id FK
+        datetime unlocked_at
+    }
+    ACTIVE_QUEST {
+        string quest_id PK
+        string profile_id FK
+        int progress
+        int target
+        datetime accepted_at
+    }
+    ACHIEVEMENT_CATALOG ||--o{ UNLOCKED_ACHIEVEMENT : "defines"
+    ACHIEVEMENT_CATALOG {
+        string id PK
+        string title
+        string description
+        string icon
+        int xp_reward
+    }
+    QUEST_CATALOG ||--o{ ACTIVE_QUEST : "defines"
+    QUEST_CATALOG {
+        string id PK
+        string title
+        string description
+        int target
+        int xp_reward
+        int min_level
+    }
+```
+
+**Storage strategy:**
+- 🟨 `state.json` → `PROFILE`, `UNLOCKED_ACHIEVEMENT`, `ACTIVE_QUEST` (small, human-readable, edited atomically).
+- 🟦 `history.db` (SQLite) → `SESSION`, `COMMAND` (append-heavy, indexed by `executed_at`).
+- 🟩 Catalogs (`ACHIEVEMENT_CATALOG`, `QUEST_CATALOG`) are compiled-in at build time, not persisted.
+
 ### 🌐 Network Features
-- [ ] SSH integration with reactive terminal view
-- [ ] Remote system monitoring (SSH tunnels)
+- [x] ✅ **SSH integration** with reactive terminal view (via `ssh2`, v0.1.1+)
+- [ ] Interactive password auth (currently agent + pubkey only)
+- [ ] Remote system monitoring over SSH tunnels
 - [ ] Distributed quest completion (team challenges)
 
 ### 🔌 Plugin System
