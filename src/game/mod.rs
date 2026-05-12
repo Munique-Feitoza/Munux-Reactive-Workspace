@@ -7,3 +7,5 @@ pub mod achievements;
 pub mod quests;
 pub mod easter_eggs;
 pub mod distro_guide;
+pub mod tutorial;
+pub mod benchmark;

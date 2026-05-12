@@ -195,6 +195,25 @@ impl GameState {
         (self.successful_commands as f64 / self.total_commands as f64) * 100.0
     }
     
+    /// Atualiza o streak diário com base na última sessão salva.
+    ///
+    /// - Mesma data: mantém o streak.
+    /// - Dia seguinte: incrementa o streak.
+    /// - Mais de um dia: reinicia o streak em 1.
+    pub fn update_daily_streak(&mut self) {
+        let today = Utc::now().date_naive();
+        let last = self.last_session.date_naive();
+        let diff = (today - last).num_days();
+
+        if diff == 1 {
+            self.daily_streak += 1;
+        } else if diff > 1 {
+            self.daily_streak = 1;
+        }
+
+        self.last_session = Utc::now();
+    }
+
     /// Gera novas quests quando sobe de nível
     pub fn refresh_quests(&mut self, i18n: &crate::i18n::I18n) {
         // Remove quests completadas

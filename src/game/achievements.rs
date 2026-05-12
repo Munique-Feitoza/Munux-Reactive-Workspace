@@ -131,20 +131,30 @@ impl AchievementChecker {
         }
     }
     
-    /// Easter eggs
+    /// Conquistas de easter egg: a do próprio easter egg descoberto e, ao atingir
+    /// o limiar, a meta-conquista "caçador de easter eggs".
     pub fn check_easter_egg(game_state: &mut GameState, command: &str, i18n: &I18n) -> Option<Achievement> {
-        match command {
-            "sudo rm -rf /" if !game_state.has_achievement("easter_egg_nuke") => {
-                Self::unlock_if_new(game_state, "easter_egg_nuke", i18n, 666)
-            },
-            "sl" if !game_state.has_achievement("easter_egg_train") => {
-                Self::unlock_if_new(game_state, "easter_egg_train", i18n, 25)
-            },
-            c if c.contains("cowsay") && !game_state.has_achievement("easter_egg_cow") => {
-                Self::unlock_if_new(game_state, "easter_egg_cow", i18n, 30)
-            },
-            _ => None
+        use crate::game::easter_eggs::{EasterEggs, HUNTER_THRESHOLD};
+
+        let egg = EasterEggs::classify(command)?;
+
+        if let Some((id, xp)) = EasterEggs::achievement(egg) {
+            if let Some(achievement) = Self::unlock_if_new(game_state, id, i18n, xp) {
+                return Some(achievement);
+            }
         }
+
+        // Meta-conquista: já encontrou easter eggs suficientes.
+        let found = game_state
+            .achievements
+            .iter()
+            .filter(|a| a.id.starts_with("easter_egg_") && a.id != "easter_egg_hunter")
+            .count();
+        if found >= HUNTER_THRESHOLD {
+            return Self::unlock_if_new(game_state, "easter_egg_hunter", i18n, 250);
+        }
+
+        None
     }
     
     /// Helper para desbloquear conquista
