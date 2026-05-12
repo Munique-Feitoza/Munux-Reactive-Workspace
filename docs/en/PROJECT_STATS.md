@@ -424,9 +424,8 @@ Total                       52     11661     1830       435   9396
 - [ ] Plugin system (~800 LOC)
 - [ ] Multiplayer features (~600 LOC)
 - [ ] Mobile app integration (~400 LOC)
-- [ ] AI suggestions (~300 LOC)
 
-**Estimated total:** ~11,400 LOC
+**Estimated total:** ~11,100 LOC
 
 ---
 

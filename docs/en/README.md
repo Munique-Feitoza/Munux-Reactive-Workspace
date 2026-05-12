@@ -2,7 +2,7 @@
 
 Welcome to the Munux Reactive Workspace documentation! This index helps you find exactly what you need.
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue) ![Status](https://img.shields.io/badge/docs-complete-green)
+![Version](https://img.shields.io/badge/version-0.2.0-blue) ![Status](https://img.shields.io/badge/docs-complete-green)
 
 ---
 

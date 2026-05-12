@@ -453,11 +453,6 @@ erDiagram
 - [ ] User-defined achievements (Lua scripting)
 - [ ] Theme marketplace
 
-### 🤖 AI Assistance
-- [ ] Command suggestions based on context (LLM integration)
-- [ ] Error explanation and auto-fixes
-- [ ] Natural language to shell translation
-
 ---
 
 ## Next Steps

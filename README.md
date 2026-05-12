@@ -7,7 +7,7 @@
 [![Language](https://img.shields.io/badge/Language-Rust-orange?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
 [![Framework](https://img.shields.io/badge/UI-Ratatui-blue?style=for-the-badge)](https://ratatui.rs/)
 [![License](https://img.shields.io/badge/License-GPLv3-red?style=for-the-badge)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Beta%20v0.1.0-green?style=for-the-badge)](https://github.com/Munique-Feitoza/Munux-Reactive-Workspace/releases)
+[![Status](https://img.shields.io/badge/Status-v0.2.0-green?style=for-the-badge)](https://github.com/Munique-Feitoza/Munux-Reactive-Workspace/releases)
 [![Made with Love](https://img.shields.io/badge/Made%20with-❤️%20and%20☕-ff69b4?style=for-the-badge)](https://github.com/Munique-Feitoza)
 [![Linux](https://img.shields.io/badge/Platform-Linux-yellow?style=for-the-badge&logo=linux)](https://www.linux.org/)
 [![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-brightgreen?style=for-the-badge)](docs/en/contributing/code-of-conduct.md)
@@ -347,15 +347,31 @@ help debian   # Ubuntu/Debian guide (apt, dpkg, snap)
 ### 6. 🛡️ Special Munux Commands
 
 ```
-- `stats` - Shows detailed statistics and progress
-- `quests` - Displays active missions with progress bars
-- `achievements` - Lists all unlocked achievements
-- `xp` - Shows current XP and level
-- `xp <number>` - Adds XP (for testing/debugging)t blocks and Popups
+- stats               - Detailed statistics and progress
+- quests              - Active missions with progress bars
+- achievements        - All unlocked achievements
+- xp / xp <number>    - Show current XP / add XP (debug)
+- tutorial            - Interactive 5-step tutorial for beginners
+- benchmark           - Typing speed test (WPM + accuracy, rewards XP)
+- alias name='cmd'    - Create a command shortcut
+- alias               - List defined aliases
+- unalias name        - Remove an alias
+- help [topic]        - Help system and per-distro guides
+```
+
+### 7. 💾 Progress Persistence
+
+Your XP, level, achievements, streak, command history and aliases are saved
+automatically to `$XDG_DATA_HOME/munux/state.json` after every command and on
+exit — pick up exactly where you left off. The daily streak updates when you
+come back the next day.
+
+### 8. 🎨 Syntax-Highlighted Previews
+
+When you `cat` a file, the preview panel renders it with lightweight syntax
+highlighting for Rust, Python, JavaScript/TypeScript, Bash, JSON and TOML.
 
 ---
-
-```
 
 <div align="center">
 

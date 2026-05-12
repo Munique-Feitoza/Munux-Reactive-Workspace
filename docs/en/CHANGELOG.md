@@ -4,29 +4,48 @@ All notable changes to Munux Reactive Workspace will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-![Version](https://img.shields.io/badge/Latest-v0.1.0-blue) ![Status](https://img.shields.io/badge/Status-Beta-yellow)
+![Version](https://img.shields.io/badge/Latest-v0.2.0-blue) ![Status](https://img.shields.io/badge/Status-Beta-yellow)
 
 ---
 
 ## [Unreleased]
 
+### Planned Features
+- [ ] Customizable themes (build your own)
+- [ ] Plugin system for custom commands
+- [ ] Competitive mode / leaderboards
+- [ ] Multiplayer challenges (compare progress)
+- [ ] Cloud sync for progression
+
+---
+
+## [0.2.0] - 2026-05-12
+
 ### ✨ Added
+- **💾 Progress persistence** ([src/core/persistence.rs](../../src/core/persistence.rs)) — XP, level, achievements, streak, command history and aliases are saved to `$XDG_DATA_HOME/munux/state.json` after every command and on exit. Atomic writes (temp file + rename) and a `.bak` fallback when a save is corrupted. Daily streak updates on the next session via `GameState::update_daily_streak`.
+- **⌨️ Tab auto-complete** ([src/core/completion.rs](../../src/core/completion.rs)) — completes the first word from built-in commands + `$PATH` executables, and arguments from filesystem paths in the current directory. Extends to the longest common prefix and lists candidates when ambiguous.
+- **🎨 Syntax highlighting in file preview** ([src/ui/highlight.rs](../../src/ui/highlight.rs)) — lightweight per-line highlighter (no extra dependencies) for Rust, Python, JavaScript/TypeScript, Bash, JSON and TOML.
+- **🔗 Custom alias system** — `alias name='cmd'`, `alias` (list), `unalias name`. Aliases are expanded at execution time (recursion-limited to avoid cycles) and persisted with the rest of the progress.
+- **🎓 Interactive tutorial mode** ([src/game/tutorial.rs](../../src/game/tutorial.rs)) — `tutorial` starts a 5-step guided walkthrough for beginners (`help` → `pwd` → `ls` → `stats` → `cat <file>`) with a +100 XP completion bonus. `tutorial sair` exits.
+- **⏱️ Benchmark mode** ([src/game/benchmark.rs](../../src/game/benchmark.rs)) — `benchmark` runs a typing speed test (WPM + accuracy) and rewards XP proportional to performance.
+- **🥚 More easter eggs & secret achievements** — new eggs (xkcd sandwich, `42`, `xyzzy`, "the cake is a lie", Vim escape reflex, Star Wars) plus matching secret achievements and the meta-achievement **Easter Egg Hunter** (find 5+ eggs). Easter egg unlocks now show an achievement popup.
 - **🌐 SSH Session Support** ([src/core/ssh.rs](../../src/core/ssh.rs)) — persistent remote shell via the `ssh2` crate.
   - Auth chain: `ssh-agent` → `userauth_agent` → `~/.ssh/id_rsa` (no password prompt yet).
   - Remote `cwd` tracking with dedicated `change_dir()` resolver.
   - Cyan-bordered terminal panel + remote prompt `user@host cwd$` when a session is active.
   - Auto-injected `--color=always` for `ls`/`grep` to preserve ANSI colors via `ansi-to-tui`.
   - `exit`/`logout` drops the session and returns to the local shell.
-- **📚 Docs refresh** — architecture and API docs now include **colored UML diagrams** (class, state, sequence, flow) in both EN and PT-BR.
+- **🌍 Internationalization** — full i18n via Project Fluent (EN / PT-BR), auto-detected from the system locale.
+- **📚 Docs refresh** — architecture and API docs include colored UML diagrams (class, state, sequence, flow) in both EN and PT-BR.
 
-### Planned Features
-- [ ] Persistent state (save XP/achievements to disk)
-- [ ] Command history persistence across sessions
-- [ ] Multiplayer challenges (compete with friends)
-- [ ] Plugin system for custom commands
-- [ ] Cloud sync for progression
-- [ ] Mobile companion app
-- [ ] AI-powered command suggestions
+### ♻️ Changed / Refactored
+- Easter egg recognition consolidated into a single `EasterEggs::classify` → `Egg` enum, the single source of truth for both the rendered art and the awarded achievement.
+- `App::award_achievement` extracted to remove duplication between achievement-unlock sites.
+- `FileEntry::get_icon` rewritten table-driven; progress saving centralized to a single point (after each command + on exit).
+- Cleanup pass: resolved all `clippy` warnings (collapsed nested conditionals, `parts.first()`, `rsplit().next()` instead of `last()` on a double-ended iterator, `Language::to_langid` by value).
+
+### 🐛 Fixed
+- Locale key typo `achievement_easter_egg_nuke-desc` (was using `_` instead of `-`), which left the achievement description missing.
 
 ---
 
