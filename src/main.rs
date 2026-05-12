@@ -40,10 +40,13 @@ fn main() -> Result<()> {
     
     // Loop principal (The Elm Architecture)
     let result = run(&mut terminal, &mut app, event_handler);
-    
+
+    // Salva o progresso ao sair
+    app.save_progress();
+
     // Restaura o terminal
     tui::restore()?;
-    
+
     result
 }
 
@@ -117,12 +120,17 @@ fn handle_event(app: &mut App, event: Event) -> Result<()> {
                 }
                 KeyCode::Enter => {
                     app.execute_command()?;
+                    // Persiste o progresso após cada comando (resiliente a fechamentos abruptos).
+                    app.save_progress();
                 }
                 KeyCode::Up => {
                     app.history_previous();
                 }
                 KeyCode::Down => {
                     app.history_next();
+                }
+                KeyCode::Tab => {
+                    app.autocomplete();
                 }
                 KeyCode::Esc => {
                     // Se estiver em modo Help, Stats ou Quests, volta ao Welcome

@@ -30,7 +30,7 @@ impl Language {
         }
     }
 
-    pub fn to_langid(&self) -> LanguageIdentifier {
+    pub fn to_langid(self) -> LanguageIdentifier {
         self.as_str().parse().expect("Invalid LangID")
     }
 }
