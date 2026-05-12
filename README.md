@@ -403,7 +403,7 @@ cargo build --release
 | **Ctrl+C** | Exits application |
 | **Ctrl+L** | Clears screen |
 | **ESC** | Clears current input or cancels dangerous command |
-| **Tab** | (Future) Auto-complete |
+| **Tab** | Auto-complete commands and file paths |
 
 ---
 
@@ -445,16 +445,16 @@ cargo build --release
 - [x] Streak system with bonuses
 - [x] Evolutionary Tux (6 forms)  
 
-### 🚧 Version 0.2.0 - In Planning
+### ✅ Version 0.2.0 - COMPLETE
 
-- [ ] Progress persistence (save/load state)
-- [ ] Auto-complete (Tab completion)
-- [ ] Persistent history between sessions
-- [ ] Syntax highlighting in file preview
-- [ ] More easter eggs and secret achievements
-- [ ] Custom alias system
-- [ ] Interactive tutorial mode for beginners
-- [ ] Benchmark mode (test typing speed)
+- [x] Progress persistence (save/load state) - **Implemented v0.2.0**
+- [x] Auto-complete (Tab completion) - **Implemented v0.2.0**
+- [x] Persistent history between sessions - **Implemented v0.2.0**
+- [x] Syntax highlighting in file preview - **Implemented v0.2.0**
+- [x] More easter eggs and secret achievements - **Implemented v0.2.0**
+- [x] Custom alias system - **Implemented v0.2.0**
+- [x] Interactive tutorial mode for beginners - **Implemented v0.2.0**
+- [x] Benchmark mode (test typing speed) - **Implemented v0.2.0**
 
 ### 🔮 Version 0.3.0 - Future
 
