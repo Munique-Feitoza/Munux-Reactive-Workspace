@@ -62,10 +62,10 @@ impl SshSession {
             let home = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
             let id_rsa = Path::new(&home).join(".ssh/id_rsa");
             
-            if id_rsa.exists() {
-                 if session.userauth_pubkey_file(user, None, &id_rsa, None).is_ok() {
-                     authenticated = true;
-                 }
+            if id_rsa.exists()
+                && session.userauth_pubkey_file(user, None, &id_rsa, None).is_ok()
+            {
+                authenticated = true;
             }
         }
 

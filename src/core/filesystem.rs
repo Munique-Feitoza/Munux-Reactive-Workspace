@@ -95,25 +95,21 @@ impl FileEntry {
     /// Retorna o ícone baseado no tipo
     pub fn get_icon(&self) -> &str {
         if self.is_symlink {
-            "🔗"
-        } else if self.is_dir {
-            "📁"
-        } else if self.name.ends_with(".rs") {
-            "🦀"
-        } else if self.name.ends_with(".py") {
-            "🐍"
-        } else if self.name.ends_with(".js") || self.name.ends_with(".ts") {
-            "📜"
-        } else if self.name.ends_with(".sh") {
-            "📜"
-        } else if self.name.ends_with(".toml") || self.name.ends_with(".json") {
-            "⚙️"
-        } else if self.name.ends_with(".md") {
-            "📝"
-        } else if self.name.starts_with('.') {
-            "👁️"
-        } else {
-            "📄"
+            return "🔗";
+        }
+        if self.is_dir {
+            return "📁";
+        }
+
+        let ext = self.name.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
+        match ext {
+            "rs" => "🦀",
+            "py" => "🐍",
+            "js" | "ts" | "sh" => "📜",
+            "toml" | "json" => "⚙️",
+            "md" => "📝",
+            _ if self.name.starts_with('.') => "👁️",
+            _ => "📄",
         }
     }
 }
