@@ -8,6 +8,7 @@ pub mod hud;
 pub mod popup;
 pub mod theme;
 pub mod stats;
+pub mod highlight;
 
 use crate::app::App;
 use ratatui::Frame;

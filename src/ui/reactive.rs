@@ -62,7 +62,7 @@ fn render_file_tree_with_hint(frame: &mut Frame, path: &std::path::Path, input: 
     // Se tem input, divide área em dica + arquivos
     if !input.is_empty() {
         let parts: Vec<&str> = input.split_whitespace().collect();
-        if let Some(hint) = get_command_hint(parts.get(0).copied().unwrap_or(""), app) {
+        if let Some(hint) = get_command_hint(parts.first().copied().unwrap_or(""), app) {
             // Divide área: 30% dica, 70% arquivos
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -104,7 +104,7 @@ fn render_file_tree(frame: &mut Frame, path: &std::path::Path, app: &App, area: 
             let color = if entry.is_dir {
                 Color::Yellow
             } else {
-                match entry.name.split('.').last() {
+                match entry.name.rsplit('.').next() {
                     Some("rs") => Color::LightRed,
                     Some("sh") => Color::Green,
                     Some("toml") | Some("json") => Color::Blue,
@@ -142,20 +142,37 @@ fn render_file_preview(
     frame: &mut Frame,
     path: &std::path::Path,
     content: &str,
-    _language: &str,
+    language: &str,
     app: &App,
     area: Rect,
 ) {
     let filename = path.file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("arquivo");
-    
+
+    // Preview com realce de sintaxe para linguagens suportadas.
+    if !content.is_empty() && crate::ui::highlight::is_supported(language) {
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" 📄 {} [{}] ", app.i18n.preview_title(filename), language))
+            .border_style(Style::default().fg(Color::Green))
+            .style(Style::default().bg(Color::Black));
+
+        let lines = crate::ui::highlight::highlight(content, language);
+        let paragraph = Paragraph::new(lines)
+            .block(block)
+            .wrap(Wrap { trim: false })
+            .scroll((app.scroll, 0));
+        frame.render_widget(paragraph, area);
+        return;
+    }
+
     let block = Block::default()
         .borders(Borders::ALL)
         .title(format!(" 📄 {} ", app.i18n.preview_title(filename)))
         .border_style(Style::default().fg(Color::Green))
         .style(Style::default().bg(Color::Black));
-    
+
     // Preview com tratamento de erro melhorado e sugestões
     let text = if !content.is_empty() {
         content.to_string()
