@@ -20,8 +20,6 @@ pub fn render_terminal_panel(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(Theme::get_border_type(app.game_state.level))
-        .borders(Borders::ALL)
-        .border_type(Theme::get_border_type(app.game_state.level))
         .title(if let Some(ssh) = &app.ssh_session {
             format!(" 🌐 SSH ACTIVE: {}@{} ", ssh.user, ssh.host)
         } else {
@@ -57,49 +55,31 @@ pub fn render_terminal_panel(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(Line::from("")); // Linha em branco após output
     }
     
-    // Mostra histórico recente (últimos 5 comandos)
-    let history_start = app.command_history.len().saturating_sub(5);
+    // Segmento Git montado uma única vez (mesmo repo p/ histórico e input).
+    let git_segment = app
+        .git_status
+        .as_ref()
+        .map(|git| git_segment_spans(git, &theme));
+
+    // Mostra histórico recente (últimos 5), nunca antes do ponto de "clear".
+    let history_start = app
+        .command_history
+        .len()
+        .saturating_sub(5)
+        .max(app.history_view_start.min(app.command_history.len()));
     for cmd in &app.command_history[history_start..] {
-        let mut prompt_spans = vec![
-            Span::styled(format!("{} [{}@munux]", symbol, rank), Style::default().fg(theme.primary).add_modifier(Modifier::BOLD)),
-        ];
+        let mut prompt_spans = vec![local_prompt_prefix(symbol, &rank, &theme)];
 
-        // Adiciona segmento Git se estiver em um repo
-        if let Some(git) = &app.git_status {
-            prompt_spans.push(Span::styled(" (", Style::default().fg(Color::DarkGray)));
-            prompt_spans.push(Span::styled(&git.repo_name, Style::default().fg(Color::LightBlue)));
-            prompt_spans.push(Span::styled(":", Style::default().fg(Color::DarkGray)));
-            prompt_spans.push(Span::styled(&git.branch, Style::default().fg(Color::LightMagenta)));
-            
-            // Adiciona indicadores de modificação
-            if git.staged > 0 {
-                prompt_spans.push(Span::styled(format!(" +{}", git.staged), Style::default().fg(theme.success)));
-            }
-            if git.modified > 0 {
-                prompt_spans.push(Span::styled(format!(" ~{}", git.modified), Style::default().fg(Color::Yellow)));
-            }
-            if git.untracked > 0 {
-                prompt_spans.push(Span::styled(format!(" ?{}", git.untracked), Style::default().fg(Color::Red)));
-            }
-            
-            // Adiciona indicadores de sync (ahead/behind)
-            if git.ahead > 0 {
-                prompt_spans.push(Span::styled(format!(" ↑{}", git.ahead), Style::default().fg(Color::Cyan)));
-            }
-            if git.behind > 0 {
-                prompt_spans.push(Span::styled(format!(" ↓{}", git.behind), Style::default().fg(Color::Red)));
-            }
-
-            prompt_spans.push(Span::styled(")", Style::default().fg(Color::DarkGray)));
+        if let Some(seg) = &git_segment {
+            prompt_spans.extend(seg.iter().cloned());
         }
 
-        prompt_spans.push(Span::styled("$ ", Style::default().fg(theme.primary)));
+        prompt_spans.push(prompt_dollar(&theme));
         prompt_spans.push(Span::raw(cmd));
-        
+
         lines.push(Line::from(prompt_spans));
     }
-    
-    // Linha de input atual com syntax highlighting e Git status
+
     // Linha de input atual
     let mut input_spans = if let Some(ssh) = &app.ssh_session {
         vec![
@@ -110,41 +90,15 @@ pub fn render_terminal_panel(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled("$ ", Style::default().fg(Color::Cyan)),
         ]
     } else {
-        vec![
-            Span::styled(format!("{} [{}@munux]", symbol, rank), Style::default().fg(theme.primary).add_modifier(Modifier::BOLD)),
-        ]
+        vec![local_prompt_prefix(symbol, &rank, &theme)]
     };
 
     if app.ssh_session.is_none() {
-        if let Some(git) = &app.git_status {
-            input_spans.push(Span::styled(" (", Style::default().fg(Color::DarkGray)));
-            input_spans.push(Span::styled(&git.repo_name, Style::default().fg(Color::LightBlue)));
-            input_spans.push(Span::styled(":", Style::default().fg(Color::DarkGray)));
-            input_spans.push(Span::styled(&git.branch, Style::default().fg(Color::LightMagenta)));
-            
-            // Adiciona indicadores de modificação
-            if git.staged > 0 {
-                input_spans.push(Span::styled(format!(" +{}", git.staged), Style::default().fg(theme.success)));
-            }
-            if git.modified > 0 {
-                input_spans.push(Span::styled(format!(" ~{}", git.modified), Style::default().fg(Color::Yellow)));
-            }
-            if git.untracked > 0 {
-                input_spans.push(Span::styled(format!(" ?{}", git.untracked), Style::default().fg(Color::Red)));
-            }
-
-            // Adiciona indicadores de sync (ahead/behind)
-            if git.ahead > 0 {
-                input_spans.push(Span::styled(format!(" ↑{}", git.ahead), Style::default().fg(Color::Cyan)));
-            }
-            if git.behind > 0 {
-                input_spans.push(Span::styled(format!(" ↓{}", git.behind), Style::default().fg(Color::Red)));
-            }
-
-            input_spans.push(Span::styled(")", Style::default().fg(Color::DarkGray)));
+        if let Some(seg) = &git_segment {
+            input_spans.extend(seg.iter().cloned());
         }
 
-        input_spans.push(Span::styled("$ ", Style::default().fg(theme.primary)));
+        input_spans.push(prompt_dollar(&theme));
     }
     
     // Adiciona o input com cores baseadas em validação
@@ -180,6 +134,58 @@ pub fn render_terminal_panel(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(paragraph, area);
 }
 
+/// Span do prefixo do prompt local: `{símbolo} [{rank}@munux]`. Fonte única —
+/// antes era montado no prompt do histórico e no do input.
+fn local_prompt_prefix(
+    symbol: &str,
+    rank: &str,
+    theme: &crate::ui::theme::Theme,
+) -> Span<'static> {
+    Span::styled(
+        format!("{} [{}@munux]", symbol, rank),
+        Style::default().fg(theme.primary).add_modifier(Modifier::BOLD),
+    )
+}
+
+/// Span do sufixo `$ ` do prompt local.
+fn prompt_dollar(theme: &crate::ui::theme::Theme) -> Span<'static> {
+    Span::styled("$ ", Style::default().fg(theme.primary))
+}
+
+/// Monta os spans do segmento Git do prompt: `(repo:branch +s ~m ?u ↑a ↓b)`.
+/// Fonte única — antes este bloco era copiado byte-a-byte no prompt do histórico
+/// e no prompt do input atual.
+fn git_segment_spans(
+    git: &crate::core::git::GitStatus,
+    theme: &crate::ui::theme::Theme,
+) -> Vec<Span<'static>> {
+    let mut spans = vec![
+        Span::styled(" (", Style::default().fg(Color::DarkGray)),
+        Span::styled(git.repo_name.clone(), Style::default().fg(Color::LightBlue)),
+        Span::styled(":", Style::default().fg(Color::DarkGray)),
+        Span::styled(git.branch.clone(), Style::default().fg(Color::LightMagenta)),
+    ];
+
+    if git.staged > 0 {
+        spans.push(Span::styled(format!(" +{}", git.staged), Style::default().fg(theme.success)));
+    }
+    if git.modified > 0 {
+        spans.push(Span::styled(format!(" ~{}", git.modified), Style::default().fg(Color::Yellow)));
+    }
+    if git.untracked > 0 {
+        spans.push(Span::styled(format!(" ?{}", git.untracked), Style::default().fg(Color::Red)));
+    }
+    if git.ahead > 0 {
+        spans.push(Span::styled(format!(" ↑{}", git.ahead), Style::default().fg(Color::Cyan)));
+    }
+    if git.behind > 0 {
+        spans.push(Span::styled(format!(" ↓{}", git.behind), Style::default().fg(Color::Red)));
+    }
+
+    spans.push(Span::styled(")", Style::default().fg(Color::DarkGray)));
+    spans
+}
+
 /// Coloriza o input baseado na validade do comando
 fn colorize_input<'a>(input: &'a str, theme: &crate::ui::theme::Theme) -> Vec<Span<'a>> {
     if input.is_empty() {
@@ -191,46 +197,11 @@ fn colorize_input<'a>(input: &'a str, theme: &crate::ui::theme::Theme) -> Vec<Sp
         return vec![Span::raw(input)];
     }
     
-    let command = parts[0];
-    
-    // Lista de comandos válidos conhecidos (expandida com gerenciadores de pacotes)
-    let valid_commands = [
-        // Navegação e arquivos
-        "ls", "cd", "pwd", "cat", "nano", "vim", "vi", "emacs", "mkdir", "touch", "rm", "rmdir",
-        "cp", "mv", "echo", "grep", "find", "locate", "top", "htop", "ps", "free", "df", "du",
-        "chmod", "chown", "chgrp", "ln", "file", "stat", "tree",
-        // Rede
-        "curl", "wget", "ping", "ssh", "scp", "rsync", "netstat", "ip", "ifconfig", "nmap",
-        // Compressão
-        "tar", "zip", "unzip", "gzip", "gunzip", "bzip2", "bunzip2", "7z", "rar", "unrar",
-        // Texto
-        "man", "help", "clear", "exit", "history", "which", "whereis", "head", "tail",
-        "less", "more", "sed", "awk", "sort", "uniq", "wc", "diff", "patch", "cut", "tr",
-        // Git
-        "git",
-        // Gerenciadores de Pacotes - Arch/Manjaro
-        "pacman", "yay", "paru", "pamac", "makepkg",
-        // Gerenciadores de Pacotes - Debian/Ubuntu
-        "apt", "apt-get", "apt-cache", "aptitude", "dpkg", "add-apt-repository",
-        // Gerenciadores de Pacotes - Fedora/RHEL
-        "dnf", "yum", "rpm",
-        // Gerenciadores de Pacotes - openSUSE
-        "zypper",
-        // Gerenciadores de Pacotes - Universal
-        "snap", "flatpak", "appimage",
-        // Sistema
-        "systemctl", "service", "journalctl", "dmesg", "uname", "hostname", "uptime",
-        "reboot", "shutdown", "poweroff", "halt",
-        // Munux especiais
-        "stats", "quests", "missions", "achievements", "xp",
-        // Easter eggs
-        "sl", "cowsay", "fortune", "matrix", "hack", "konami",
-    ];
-    
-    // Comandos perigosos
-    let dangerous_commands = ["rm", "sudo", "dd", "mkfs", "fdisk", "kill", "killall", 
-                             "reboot", "shutdown", "poweroff", "halt"];
-    
+    // Classificação derivada da fonte única (`core::commands`): a cor do comando
+    // segue exatamente o classificador, eliminando as antigas listas divergentes.
+    // Usa o input completo para captar `rm -rf` como perigoso.
+    let cmd_type = crate::core::parser::CommandParser::classify_command(input);
+
     let mut spans = Vec::new();
     let mut current_pos = 0;
     
@@ -245,15 +216,13 @@ fn colorize_input<'a>(input: &'a str, theme: &crate::ui::theme::Theme) -> Vec<Sp
         }
         
         if i == 0 {
-            // Primeira palavra é o comando
-            let color = if dangerous_commands.contains(&command) {
-                theme.danger
-            } else if valid_commands.contains(&command) {
-                theme.success
-            } else {
-                theme.warning // Comando desconhecido/inválido
+            // Primeira palavra é o comando — cor pela classificação única.
+            let color = match cmd_type {
+                crate::core::parser::CommandType::Dangerous => theme.danger,
+                crate::core::parser::CommandType::Unknown => theme.warning,
+                _ => theme.success,
             };
-            
+
             spans.push(Span::styled(
                 *part,
                 Style::default().fg(color).add_modifier(Modifier::BOLD),

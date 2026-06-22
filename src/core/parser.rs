@@ -1,7 +1,6 @@
 // Author: Munique Alves Pacheco Feitoza
 // License: GPLv3
 
-use crate::app::RightPanelMode;
 use std::path::PathBuf;
 
 /// Analisador de comandos em tempo real
@@ -27,209 +26,37 @@ pub enum CommandType {
 }
 
 impl CommandParser {
-    /// Analisa o comando e retorna o tipo
+    /// Analisa o comando e retorna o tipo, consultando a fonte única
+    /// (`core::commands`). Só `rm` tem lógica especial: vira `Dangerous`
+    /// quando acompanhado de flags destrutivas.
     pub fn classify_command(input: &str) -> CommandType {
         let trimmed = input.trim();
-        
+
         if trimmed.is_empty() {
             return CommandType::Unknown;
         }
-        
+
         // Extrai o primeiro token (comando base)
         let first_word = trimmed.split_whitespace().next().unwrap_or("");
-        
-        match first_word {
-            // Navegação
-            "cd" | "ls" | "pwd" | "dirs" | "pushd" | "popd" => CommandType::Navigation,
-            
-            // Operações de arquivo
-            "mkdir" | "touch" | "cp" | "mv" | "rmdir" => CommandType::FileOperation,
-            
-            // Visualização de arquivos
-            "cat" | "less" | "more" | "head" | "tail" | "nano" | "vim" | "vi" | "emacs" => {
-                CommandType::FileViewing
-            }
-            
-            // Monitoramento
-            "top" | "htop" | "ps" | "free" | "df" | "du" | "vmstat" | "iostat" => {
-                CommandType::SystemMonitoring
-            }
-            
-            // Busca
-            "grep" | "find" | "locate" | "which" | "whereis" => CommandType::Search,
-            
-            // Git
-            "git" => CommandType::VersionControl,
-            
-            // Gerenciadores de Pacotes
-            "pacman" | "yay" | "paru" | "pamac" => CommandType::PackageManager,  // Arch/Manjaro
-            "apt" | "apt-get" | "aptitude" | "dpkg" => CommandType::PackageManager,  // Debian/Ubuntu
-            "dnf" | "yum" => CommandType::PackageManager,  // Fedora/RHEL
-            "zypper" => CommandType::PackageManager,  // openSUSE
-            "snap" | "flatpak" | "appimage" => CommandType::PackageManager,  // Universal
-            
-            // Ferramentas de Rede
-            "ping" | "curl" | "wget" | "ssh" | "scp" | "rsync" | "netstat" | "ip" | "ifconfig" => {
-                CommandType::NetworkTools
-            }
-            
-            // Compressão/Arquivamento
-            "tar" | "zip" | "unzip" | "gzip" | "gunzip" | "bzip2" | "7z" | "rar" | "unrar" => {
-                CommandType::Compression
-            }
-            
-            // Processamento de Texto
-            "sed" | "awk" | "cut" | "sort" | "uniq" | "wc" | "tr" | "diff" | "patch" => {
-                CommandType::TextProcessing
-            }
-            
-            // Administração do Sistema
-            "systemctl" | "service" | "journalctl" | "dmesg" | "uname" | "hostname" | "reboot" | "shutdown" => {
-                CommandType::SystemAdmin
-            }
-            
-            // Comandos perigosos
-            "rm" => {
-                // Verifica se tem flags destrutivas
-                if trimmed.contains("-rf") 
-                    || trimmed.contains("-fr") 
-                    || trimmed.contains("-r")
-                    || trimmed.contains("-f") {
-                    CommandType::Dangerous
-                } else {
-                    CommandType::FileOperation
-                }
-            }
-            "sudo" | "dd" | "mkfs" | "fdisk" | "parted" | "chmod" | "chown" => {
+
+        if first_word == "rm" {
+            let destructive = trimmed.contains("-rf")
+                || trimmed.contains("-fr")
+                || trimmed.contains("-r")
+                || trimmed.contains("-f");
+            return if destructive {
                 CommandType::Dangerous
-            }
-            
-            // Comandos especiais do Munux
-            "stats" | "quests" | "missions" | "achievements" | "xp" | "help" => {
-                CommandType::MunuxSpecial
-            }
-            
-            // Easter eggs
-            "sl" | "cowsay" | "fortune" | "matrix" | "hack" | "konami" => {
-                CommandType::EasterEgg
-            }
-            
-            _ => CommandType::Unknown,
+            } else {
+                CommandType::FileOperation
+            };
         }
+
+        crate::core::commands::command_type(first_word).unwrap_or(CommandType::Unknown)
     }
     
-    /// Converte o tipo de comando para o modo do painel direito
-    pub fn command_to_panel_mode(input: &str, current_dir: &PathBuf) -> RightPanelMode {
-        let cmd_type = Self::classify_command(input);
-        let trimmed = input.trim();
-        
-        match cmd_type {
-            CommandType::Dangerous => {
-                // Mensagens específicas por tipo de comando perigoso
-                // Mensagens específicas por tipo de comando perigoso
-                let warning = match trimmed {
-                    t if t.contains("rm") && (t.contains("-rf") || t.contains("-fr")) => {
-                        if t.contains('/') && (t.contains("/*") || t.ends_with("/")) {
-                            "REMOÇÃO RECURSIVA EM DIRETÓRIO RAIZ!"
-                        } else {
-                            "Remoção recursiva e forçada de arquivos"
-                        }
-                    },
-                    t if t.contains("rm") => "Remoção de arquivo(s) - operação irreversível",
-                    t if t.starts_with("sudo") => "Execução com privilégios de superusuário",
-                    t if t.contains("dd") => "Cópia de baixo nível - pode sobrescrever dados",
-                    t if t.contains("mkfs") || t.contains("fdisk") || t.contains("parted") => 
-                        "Modificação de partições/sistema de arquivos",
-                    t if t.contains("chmod") || t.contains("chown") => 
-                        "Modificação de permissões/propriedade de arquivos",
-                    t if t.contains("reboot") || t.contains("shutdown") || t.contains("poweroff") => 
-                        "Desligamento/reinicialização do sistema",
-                    _ => "Comando potencialmente destrutivo detectado",
-                };
-                
-                RightPanelMode::DangerZone {
-                    warning: warning.to_string(),
-                    command: trimmed.to_string(),
-                }
-            }
-            
-            CommandType::FileViewing => {
-                // Extrai o nome do arquivo (parcial ou completo)
-                let parts: Vec<&str> = trimmed.split_whitespace().collect();
-                if parts.len() >= 2 {
-                    let filename = parts[1];
-                    
-                    // Busca arquivos que correspondem
-                    let matches = Self::find_matching_files(current_dir, filename);
-                    
-                    if matches.len() == 1 {
-                        // Se encontrou exatamente 1, mostra preview
-                        RightPanelMode::FilePreview {
-                            path: matches[0].clone(),
-                            content: String::new(),
-                            language: Self::detect_language(filename),
-                        }
-                    } else if matches.len() > 1 {
-                        // Se encontrou vários, mostra lista de sugestões
-                        let suggestions = matches.iter()
-                            .filter_map(|p| p.file_name()?.to_str().map(|s| s.to_string()))
-                            .collect::<Vec<_>>()
-                            .join("\n  → ");
-                        
-                        RightPanelMode::FilePreview {
-                            path: current_dir.join(filename),
-                            content: format!("💡 Arquivos encontrados:\n\n  → {}", suggestions),
-                            language: "text".to_string(),
-                        }
-                    } else {
-                        // Nenhum encontrado, mostra erro
-                        RightPanelMode::FilePreview {
-                            path: current_dir.join(filename),
-                            content: String::new(),
-                            language: Self::detect_language(filename),
-                        }
-                    }
-                } else {
-                    RightPanelMode::FileTree {
-                        path: current_dir.clone(),
-                    }
-                }
-            }
-            
-            CommandType::SystemMonitoring => {
-                RightPanelMode::ResourceMonitor {
-                    cpu_usage: 0.0,
-                    memory_used: 0,
-                    memory_total: 0,
-                    process_count: 0,
-                }
-            }
-            
-            _ => RightPanelMode::FileTree {
-                path: current_dir.clone(),
-            },
-        }
-    }
-    
-    /// Detecta a linguagem do arquivo pela extensão
+    /// Detecta a linguagem do arquivo pela extensão (delega à fonte única).
     pub fn detect_language(filename: &str) -> String {
-        if filename.ends_with(".rs") {
-            "rust".to_string()
-        } else if filename.ends_with(".py") {
-            "python".to_string()
-        } else if filename.ends_with(".js") || filename.ends_with(".ts") {
-            "javascript".to_string()
-        } else if filename.ends_with(".sh") {
-            "bash".to_string()
-        } else if filename.ends_with(".toml") {
-            "toml".to_string()
-        } else if filename.ends_with(".json") {
-            "json".to_string()
-        } else if filename.ends_with(".md") {
-            "markdown".to_string()
-        } else {
-            "text".to_string()
-        }
+        crate::core::filetype::classify(filename).language.to_string()
     }
     
     /// Verifica se o comando requer permissões administrativas
@@ -241,21 +68,66 @@ impl CommandParser {
         trimmed.starts_with("service")
     }
     
-    /// Verifica se o comando é permitido no modo seguro
+    /// Verifica se o comando é permitido no modo seguro.
+    ///
+    /// Analisa **todos** os segmentos separados por `;`, `&&`, `||`, `|`, `&`
+    /// (não apenas o primeiro token), fechando o bypass `echo ok; rm -rf /`.
+    /// Substituição de comando (`$(...)` / crase) é bloqueada por poder esconder
+    /// comandos perigosos dentro de um comando aparentemente seguro.
     pub fn is_safe_command(input: &str, safe_mode: bool) -> bool {
         if !safe_mode {
             return true; // Modo livre, tudo é permitido
         }
-        
-        let cmd_type = Self::classify_command(input);
-        match cmd_type {
-            CommandType::Dangerous => false,
-            _ => !Self::requires_sudo(input),
+
+        if input.contains("$(") || input.contains('`') {
+            return false;
         }
+
+        Self::split_segments(input).into_iter().all(|segment| {
+            let segment = segment.trim();
+            if segment.is_empty() {
+                return true;
+            }
+            !matches!(Self::classify_command(segment), CommandType::Dangerous)
+                && !Self::requires_sudo(segment)
+        })
+    }
+
+    /// Divide uma linha de comando em segmentos executáveis independentes,
+    /// separados por `;`, `&&`, `||`, `|`, `&` ou nova linha.
+    ///
+    /// Conservador por design (uso exclusivo na validação do modo seguro): não
+    /// interpreta aspas, então no máximo divide demais — nunca de menos. Os
+    /// separadores são ASCII, garantindo fatiamento em fronteiras UTF-8 válidas.
+    fn split_segments(input: &str) -> Vec<&str> {
+        let bytes = input.as_bytes();
+        let mut segments = Vec::new();
+        let mut start = 0;
+        let mut i = 0;
+        while i < bytes.len() {
+            match bytes[i] {
+                b';' | b'\n' | b'|' | b'&' => {
+                    segments.push(&input[start..i]);
+                    // Operadores duplos (`&&`, `||`) contam como um separador só.
+                    if (bytes[i] == b'&' || bytes[i] == b'|')
+                        && i + 1 < bytes.len()
+                        && bytes[i + 1] == bytes[i]
+                    {
+                        i += 1;
+                    }
+                    i += 1;
+                    start = i;
+                }
+                _ => i += 1,
+            }
+        }
+        segments.push(&input[start..]);
+        segments
     }
     
-    /// Busca todos os arquivos que correspondem ao nome parcial
-    fn find_matching_files(dir: &PathBuf, partial_name: &str) -> Vec<PathBuf> {
+    /// Busca todos os arquivos que correspondem ao nome parcial.
+    /// `pub(crate)` para a camada `app` montar o painel de preview/sugestões.
+    pub(crate) fn find_matching_files(dir: &PathBuf, partial_name: &str) -> Vec<PathBuf> {
         let mut matches = Vec::new();
         
         // Se o arquivo existe exatamente, retorna só ele
@@ -351,5 +223,22 @@ mod tests {
     #[test]
     fn test_classify_file_viewing() {
         assert_eq!(CommandParser::classify_command("cat test.txt"), CommandType::FileViewing);
+    }
+
+    #[test]
+    fn test_safe_mode_blocks_separator_bypass() {
+        // Bypass histórico: comando perigoso após um separador passava batido.
+        assert!(!CommandParser::is_safe_command("echo ok; rm -rf /tmp/x", true));
+        assert!(!CommandParser::is_safe_command("x=1 && rm -rf algo", true));
+        assert!(!CommandParser::is_safe_command("echo a || dd if=/dev/zero of=/dev/sda", true));
+        assert!(!CommandParser::is_safe_command("ls | sudo tee /etc/x", true));
+        // Substituição de comando esconde o perigoso.
+        assert!(!CommandParser::is_safe_command("echo $(rm -rf /)", true));
+        assert!(!CommandParser::is_safe_command("echo `rm -rf /`", true));
+        // Comandos legítimos continuam permitidos.
+        assert!(CommandParser::is_safe_command("ls -la", true));
+        assert!(CommandParser::is_safe_command("echo ok && ls", true));
+        // Modo livre permite tudo.
+        assert!(CommandParser::is_safe_command("rm -rf /tmp/x", false));
     }
 }

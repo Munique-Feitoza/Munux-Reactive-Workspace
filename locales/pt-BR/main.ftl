@@ -237,3 +237,193 @@ hint-mv = Mover ou renomear arquivo
 hint-ssh = Acesso remoto
 hint-grep = Buscar texto
 hint-systemctl = Gerenciar serviços
+
+# Zona de Perigo (DangerZone) e confirmação
+ui-attention-max = ATENÇÃO MÁXIMA
+ui-command-detected = Comando detectado
+ui-risk = Risco
+ui-data-loss = Perda irreversível de dados
+ui-unstable-system = Sistema pode ficar instável
+ui-irreversible-damage = Dano impossível de desfazer
+ui-available-actions = Ações disponíveis
+ui-cancel-rec = Cancelar (recomendado)
+ui-execute-anyway = Executar mesmo assim
+ui-backup-tip = Faça backup antes de executar comandos destrutivos.
+sys-danger-confirm = ⚠️ Comando perigoso. Digite 'sim' e Enter para confirmar, ou ESC para cancelar.
+sys-danger-cancelled = ✓ Comando perigoso cancelado.
+
+# Progressão de patente
+ui-next-rank = 🎯 Próxima patente: { $rank } (nível { $level })
+ui-max-rank = 🏆 Patente máxima alcançada!
+
+# Alias
+sys-alias-none = Nenhum alias definido. Use: alias nome='comando'
+sys-alias-list-title = 📎 Aliases definidos:
+sys-alias-removed = ✓ Alias '{ $name }' removido.
+sys-alias-missing = ✗ Alias '{ $name }' não existe.
+sys-alias-usage = Uso: alias nome='comando'
+sys-alias-no-spaces = ✗ O nome do alias não pode conter espaços.
+sys-alias-created = ✓ Alias criado: { $name } = { $value }
+
+# Tutorial
+sys-tutorial-ended = 🎓 Tutorial encerrado. Volte quando quiser: 'tutorial'.
+sys-tutorial-none = Nenhum tutorial em andamento.
+sys-tutorial-started = 🎓 Tutorial iniciado! Siga as instruções no quadro.
+sys-tutorial-mode-title = 🎓 Modo Tutorial
+sys-tutorial-step-done-title = ✅ Passo concluído!
+sys-tutorial-complete-title = 🎉 Tutorial concluído!
+sys-tutorial-complete-body = Parabéns! Você dominou o básico do Munux.{ "" }
+    { "" }
+    +{ $xp } XP de bônus!{ "" }
+    { "" }
+    Agora explore à vontade — use 'help' sempre que precisar.
+
+# Benchmark
+sys-bench-none = Nenhum benchmark em andamento.
+sys-bench-cancelled = ⏱️ Benchmark cancelado.
+sys-bench-result-title = ⏱️ Resultado do Benchmark
+sys-bench-popup-title = ⏱️ Benchmark de Digitação
+sys-bench-result = ⏱️ { $seconds }s  •  { $wpm } WPM  •  { $accuracy }% de precisão  •  +{ $xp } XP
+sys-bench-start = ⏱️ BENCHMARK DE DIGITAÇÃO{ "" }
+    { "" }
+    Digite a frase abaixo e pressione Enter:{ "" }
+    { "" }
+      { $phrase }{ "" }
+    { "" }
+    ('benchmark sair' cancela)
+sys-bench-popup-body = Digite exatamente esta frase e pressione Enter:{ "" }
+    { "" }
+    { $phrase }{ "" }
+    { "" }
+    O cronômetro já começou! ('benchmark sair' para cancelar)
+
+# SSH
+sys-error = ✗ Erro: { $msg }
+sys-ssh-disconnected = 🔌 Desconectado do servidor remoto.
+sys-ssh-cd-ok = ✓ Diretório remoto alterado para: { $dir }
+sys-ssh-exec-error = ✗ Erro de execução remota: { $msg }
+sys-ssh-connecting = 🔄 Conectando a { $user }@{ $host }...
+sys-ssh-connected = ✓ Conectado a { $host } em { $dir }
+sys-ssh-conn-title = Conexão Estabelecida
+sys-ssh-conn-body = Conectado com sucesso a { $user }@{ $host }{ "" }
+    { "" }
+    Diretório: { $dir }
+sys-ssh-fail = ✗ Falha na conexão: { $msg }
+sys-ssh-fail-title = Erro de Conexão
+sys-ssh-fail-body = Não foi possível conectar a { $target }:{ "" }
+    { $msg }
+
+# Comandos especiais / help
+sys-showing-stats = ✓ Mostrando estatísticas
+sys-showing-quests = ✓ Mostrando missões ativas
+sys-tip-title = 💡 Dica do Dia
+sys-tip-body = Use o comando 'help' para listar todos os comandos disponíveis.{ "" }
+    { "" }
+    Experimente 'stats' para ver seu progresso!
+sys-tip-showing = Mostrando dica...
+sys-help-cmd = 📚 Ajuda do comando: { $topic }
+sys-help-showing-title = 📚 Mostrando: { $title } (Pressione ESC para voltar)
+sys-help-showing = 📚 Mostrando ajuda (Pressione ESC para voltar)
+help-system-title = Sistema de Ajuda Munux
+help-system-body =
+    📚 MUNUX HELP SYSTEM
+
+    Use: help <distro>
+
+    Distribuições suportadas:
+      help arch     - Manjaro, Arch Linux (pacman, yay, paru)
+      help debian   - Ubuntu, Debian, Mint (apt, dpkg, snap)
+      help fedora   - Fedora, RHEL, CentOS (dnf, rpm)
+      help opensuse - openSUSE (zypper)
+      help linux    - Comandos universais Linux
+
+    Comandos especiais Munux:
+      stats         → Estatísticas e progresso
+      quests        → Missões ativas
+      achievements  → Conquistas desbloqueadas
+      tutorial      → Tutorial interativo para iniciantes
+      benchmark     → Teste de velocidade de digitação
+      alias n='cmd' → Cria um atalho de comando (unalias n remove)
+
+    Pressione ESC para voltar ao modo normal.
+
+# Execução de comandos (shell, cd, ls)
+sys-cd-ok = ✓ Diretório alterado para: { $dir }
+sys-cd-notfound = Diretório não encontrado: { $path }
+sys-ls-listed = 📂 Arquivos listados no painel direito →
+sys-cmd-ok = ✓ Comando executado com sucesso
+sys-cmd-error = ✗ Erro na execução do comando
+sys-cmd-exec-error = ✗ Erro ao executar comando: { $msg }
+sys-quest-complete = { "" }
+    📋 MISSÃO COMPLETA!{ "" }
+    { $title }{ "" }
+    +{ $xp } XP
+
+# Level up / conquistas
+sys-levelup-title = 🎉 LEVEL UP!
+sys-levelup-body = Nível { $old } → { $new }{ "" }
+    { "" }
+    { $rank }{ "" }
+    { "" }
+    { $msg }
+sys-achievement-title = 🏆 Conquista Desbloqueada!
+sys-achievement-announce = 🏆 CONQUISTA DESBLOQUEADA!{ "" }
+    { "" }
+    { $name }{ "" }
+    { $desc }{ "" }
+    { "" }
+    +{ $xp } XP
+
+# Dicas educativas (texto; os matchers de saída do shell ficam no código)
+hint-err-rm-isdir = { "" }
+    { "" }
+    💡 DICA: 'rm' remove ARQUIVOS.{ "" }
+       Para remover diretórios use:{ "" }
+       - 'rmdir nome'     (diretório vazio){ "" }
+       - 'rm -r nome'     (diretório com conteúdo){ "" }
+       - 'rm -rf nome'    (força remoção - CUIDADO!)
+hint-err-rmdir-notempty = { "" }
+    { "" }
+    💡 DICA: 'rmdir' só remove diretórios VAZIOS.{ "" }
+       Para remover com conteúdo use: 'rm -r nome'
+hint-err-cat-isdir = { "" }
+    { "" }
+    💡 DICA: 'cat' mostra conteúdo de ARQUIVOS.{ "" }
+       Para listar diretórios use: 'ls nome'
+hint-err-cd-notdir = { "" }
+    { "" }
+    💡 DICA: 'cd' navega para DIRETÓRIOS.{ "" }
+       Para abrir arquivos use: 'cat nome' ou 'nano nome'
+hint-err-mkdir-dots = { "" }
+    { "" }
+    💡 DICA: 'mkdir' cria DIRETÓRIOS (pastas).{ "" }
+       Para criar arquivos use:{ "" }
+       - 'touch arquivo.txt'          (arquivo vazio){ "" }
+       - 'echo "texto" > arquivo.txt'  (arquivo com conteúdo)
+hint-err-permission = { "" }
+    { "" }
+    💡 DICA: Você não tem permissão.{ "" }
+       Tente com 'sudo' antes do comando (cuidado!)
+hint-err-notfound = { "" }
+    { "" }
+    💡 DICA: Comando não existe ou não está instalado.{ "" }
+       - Verifique se digitou corretamente{ "" }
+       - Use 'which comando' para verificar se existe
+
+# Avisos da zona de perigo (texto mostrado no painel DangerZone)
+danger-rm-root = REMOÇÃO RECURSIVA EM DIRETÓRIO RAIZ!
+danger-rm-rf = Remoção recursiva e forçada de arquivos
+danger-rm = Remoção de arquivo(s) - operação irreversível
+danger-sudo = Execução com privilégios de superusuário
+danger-dd = Cópia de baixo nível - pode sobrescrever dados
+danger-fs = Modificação de partições/sistema de arquivos
+danger-perm = Modificação de permissões/propriedade de arquivos
+danger-power = Desligamento/reinicialização do sistema
+danger-generic = Comando potencialmente destrutivo detectado
+
+# Diversos
+ui-top-processes = Top processos (CPU)
+ui-browse-hint = ↑↓ navegar • Enter abrir
+ui-back-to-normal = Voltando ao modo normal
+sys-file-not-found = ❌ Arquivo '{ $name }' não encontrado
+sys-files-found = 💡 Arquivos encontrados:

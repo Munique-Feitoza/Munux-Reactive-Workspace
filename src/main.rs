@@ -22,30 +22,28 @@ fn main() -> Result<()> {
         original_hook(panic);
     }));
     
-    // Inicializa o terminal
-    let mut terminal = tui::init()?;
-    
-    // Cria a aplicação
+    // Inicializa o terminal via RAII guard: a restauração acontece no `Drop`,
+    // cobrindo retorno normal, early-return via `?` e panic.
+    let mut guard = tui::TerminalGuard::new()?;
+
+    // Cria a aplicação (se falhar aqui, o `guard` restaura o terminal no Drop).
     let mut app = App::new()?;
-    
+
     // Cria o gerenciador de eventos
     let event_handler = EventHandler::default();
-    
+
     // Mensagem de boas-vindas
     app.show_popup(
         app.i18n.welcome_title(),
         app.i18n.tc("sys-welcome-body"),
         app::PopupType::Info,
     );
-    
+
     // Loop principal (The Elm Architecture)
-    let result = run(&mut terminal, &mut app, event_handler);
+    let result = run(guard.terminal(), &mut app, event_handler);
 
-    // Salva o progresso ao sair
+    // Salva o progresso ao sair (o terminal é restaurado quando `guard` sai de escopo).
     app.save_progress();
-
-    // Restaura o terminal
-    tui::restore()?;
 
     result
 }
@@ -101,9 +99,8 @@ fn handle_event(app: &mut App, event: Event) -> Result<()> {
                         app.should_quit = true;
                     }
                     KeyCode::Char('l') | KeyCode::Char('L') => {
-                        // Limpa a tela (Ctrl+L)
-                        app.command_history.clear();
-                        app.clear_input();
+                        // Limpa a tela (Ctrl+L) — mesmo conceito do comando `clear`.
+                        app.clear_screen();
                     }
                     _ => {}
                 }
@@ -119,15 +116,29 @@ fn handle_event(app: &mut App, event: Event) -> Result<()> {
                     app.delete_char();
                 }
                 KeyCode::Enter => {
-                    app.execute_command()?;
-                    // Persiste o progresso após cada comando (resiliente a fechamentos abruptos).
-                    app.save_progress();
+                    // Com a árvore visível e sem nada digitado, Enter abre o item
+                    // selecionado (navegação); caso contrário executa o comando.
+                    if app.is_browsing_files() {
+                        app.open_selected_entry();
+                    } else {
+                        app.execute_command()?;
+                        // Persiste o progresso após cada comando (resiliente a fechamentos abruptos).
+                        app.save_progress();
+                    }
                 }
                 KeyCode::Up => {
-                    app.history_previous();
+                    if app.is_browsing_files() {
+                        app.move_file_selection(-1);
+                    } else {
+                        app.history_previous();
+                    }
                 }
                 KeyCode::Down => {
-                    app.history_next();
+                    if app.is_browsing_files() {
+                        app.move_file_selection(1);
+                    } else {
+                        app.history_next();
+                    }
                 }
                 KeyCode::Tab => {
                     app.autocomplete();
@@ -141,7 +152,7 @@ fn handle_event(app: &mut App, event: Event) -> Result<()> {
                         app::RightPanelMode::EasterEgg { .. } |
                         app::RightPanelMode::CommandOutput(_) => {
                             app.right_panel_mode = app::RightPanelMode::Welcome;
-                            app.last_output = "Voltando ao modo normal".to_string();
+                            app.last_output = app.i18n.tc("ui-back-to-normal");
                         }
                         _ => {
                             app.clear_input();
@@ -158,12 +169,16 @@ fn handle_event(app: &mut App, event: Event) -> Result<()> {
             }
         }
         Event::Tick => {
-            // Atualiza informações do sistema se estiver em modo monitor
-            if matches!(app.right_panel_mode, app::RightPanelMode::ResourceMonitor { .. }) {
-                update_system_monitor(app);
+            // Atualiza o monitor persistente quando um painel que mostra métricas
+            // está ativo (recursos ou estatísticas).
+            if matches!(
+                app.right_panel_mode,
+                app::RightPanelMode::ResourceMonitor { .. } | app::RightPanelMode::Stats
+            ) {
+                app.refresh_monitor();
             }
         }
-        Event::Resize(_, _) => {
+        Event::Resize => {
             // O Ratatui lida com resize automaticamente
             // Apenas re-renderiza no próximo loop
         }
@@ -181,19 +196,4 @@ fn handle_event(app: &mut App, event: Event) -> Result<()> {
     }
     
     Ok(())
-}
-
-/// Atualiza as informações do monitor de sistema
-fn update_system_monitor(app: &mut App) {
-    use core::SystemMonitor;
-    
-    let mut monitor = SystemMonitor::new();
-    let summary = monitor.get_system_summary();
-    
-    app.right_panel_mode = app::RightPanelMode::ResourceMonitor {
-        cpu_usage: summary.cpu_usage,
-        memory_used: summary.memory_used,
-        memory_total: summary.memory_total,
-        process_count: summary.process_count,
-    };
 }

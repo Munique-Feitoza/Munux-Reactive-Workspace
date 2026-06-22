@@ -58,13 +58,7 @@ impl FileSystemManager {
         
         Ok(entries)
     }
-    
-    /// Verifica se um caminho existe e é seguro
-    #[allow(dead_code)]
-    pub fn is_safe_path(path: &Path) -> bool {
-        path.exists() && !path.to_string_lossy().contains("..")
-    }
-    
+
     /// Formata o tamanho do arquivo de forma legível
     pub fn format_size(bytes: u64) -> String {
         const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
@@ -82,7 +76,6 @@ impl FileSystemManager {
 
 /// Entrada de arquivo/diretório
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct FileEntry {
     pub name: String,
     pub path: PathBuf,
@@ -100,16 +93,6 @@ impl FileEntry {
         if self.is_dir {
             return "📁";
         }
-
-        let ext = self.name.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
-        match ext {
-            "rs" => "🦀",
-            "py" => "🐍",
-            "js" | "ts" | "sh" => "📜",
-            "toml" | "json" => "⚙️",
-            "md" => "📝",
-            _ if self.name.starts_with('.') => "👁️",
-            _ => "📄",
-        }
+        crate::core::filetype::classify(&self.name).icon
     }
 }

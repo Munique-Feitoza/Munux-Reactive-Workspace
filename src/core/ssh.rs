@@ -16,6 +16,16 @@ pub struct SshSession {
     pub remote_cwd: String,
 }
 
+/// Faz shell-quoting POSIX de um valor que será interpolado num comando remoto.
+///
+/// Envolve em aspas simples e escapa aspas simples internas (`'` -> `'\''`),
+/// neutralizando injeção via `remote_cwd` (vem do `pwd` do servidor) e via
+/// caminhos informados pelo usuário. O comando do próprio usuário NÃO é citado:
+/// ele é o shell remoto e precisa preservar pipes/redirecionamentos.
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
 impl SshSession {
     /// Conecta a um host SSH
     pub fn connect(user: &str, host: &str) -> Result<Self> {
@@ -96,8 +106,9 @@ impl SshSession {
         let mut channel = self.session.channel_session()
             .context("Falha ao abrir canal SSH")?;
         
-        // Executa no diretório atual remoto
-        let cmd = format!("cd {} && {}", self.remote_cwd, command);
+        // Executa no diretório atual remoto. `remote_cwd` é citado (vem do
+        // servidor); `command` permanece cru por ser o shell do usuário.
+        let cmd = format!("cd {} && {}", shell_quote(&self.remote_cwd), command);
         
         channel.exec(&cmd)?;
         
@@ -125,8 +136,8 @@ impl SshSession {
              format!("{}/{}", self.remote_cwd, path)
         };
 
-        // Verifica se o diretório existe tentando dar cd
-        let (stdout, _, code) = self.execute(&format!("cd {} && pwd", new_path))?;
+        // Verifica se o diretório existe tentando dar cd (path citado contra injeção).
+        let (stdout, _, code) = self.execute(&format!("cd {} && pwd", shell_quote(&new_path)))?;
         
         if code == 0 {
             self.remote_cwd = stdout.trim().to_string();

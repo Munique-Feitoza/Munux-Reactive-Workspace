@@ -3,6 +3,15 @@
 
 use sysinfo::System;
 
+/// Percentual de memória usada em `0.0..=100.0`, protegido contra divisão por
+/// zero (`total == 0` => 0). Fonte única do cálculo, antes repetido em 3 lugares.
+pub fn mem_percent(used: u64, total: u64) -> f32 {
+    if total == 0 {
+        return 0.0;
+    }
+    (used as f64 / total as f64 * 100.0) as f32
+}
+
 /// Monitor de recursos do sistema
 pub struct SystemMonitor {
     system: System,
@@ -69,14 +78,14 @@ impl SystemMonitor {
     /// Retorna informações formatadas do sistema
     pub fn get_system_summary(&mut self) -> SystemSummary {
         self.refresh();
-        
+
         let (mem_used, mem_total) = self.get_memory_info();
-        
+
         SystemSummary {
             cpu_usage: self.get_cpu_usage(),
             memory_used: mem_used,
             memory_total: mem_total,
-            memory_percent: (mem_used as f64 / mem_total as f64 * 100.0) as f32,
+            memory_percent: mem_percent(mem_used, mem_total),
             process_count: self.get_process_count(),
             top_processes: self.get_top_processes(),
         }
@@ -91,7 +100,6 @@ impl Default for SystemMonitor {
 
 /// Informações de um processo
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ProcessInfo {
     pub pid: String,
     pub name: String,
@@ -100,8 +108,7 @@ pub struct ProcessInfo {
 }
 
 /// Resumo do sistema
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Default)]
 pub struct SystemSummary {
     pub cpu_usage: f32,
     pub memory_used: u64,

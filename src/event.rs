@@ -7,17 +7,16 @@ use std::time::Duration;
 
 /// Tipos de eventos que a aplicação pode receber
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum Event {
     /// Evento de tecla pressionada
     Key(KeyEvent),
-    
+
     /// Evento de mouse
     Mouse(MouseEvent),
-    
-    /// Evento de redimensionamento de terminal
-    Resize(u16, u16),
-    
+
+    /// Redimensionamento do terminal (sem payload: o Ratatui relê o tamanho sozinho)
+    Resize,
+
     /// Tick de atualização (para animações e polling)
     Tick,
 }
@@ -43,7 +42,7 @@ impl EventHandler {
             match event::read()? {
                 CrosstermEvent::Key(key) => Ok(Event::Key(key)),
                 CrosstermEvent::Mouse(mouse) => Ok(Event::Mouse(mouse)),
-                CrosstermEvent::Resize(width, height) => Ok(Event::Resize(width, height)),
+                CrosstermEvent::Resize(_, _) => Ok(Event::Resize),
                 _ => Ok(Event::Tick),
             }
         } else {

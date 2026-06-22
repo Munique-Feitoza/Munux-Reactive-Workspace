@@ -99,20 +99,25 @@ impl I18n {
         self.t(key, None)
     }
 
+    /// Traduz `key` retornando `None` quando a chave não existe (em vez do
+    /// sentinela `[MISSING: ...]`). Fonte única do teste de "chave ausente".
+    pub fn try_t(&self, key: &str) -> Option<String> {
+        let value = self.t(key, None);
+        if value.starts_with("[MISSING") {
+            None
+        } else {
+            Some(value)
+        }
+    }
+
     /// Implementation for specific helpers to maintain compatibility or ease of use
     pub fn xp_label(&self, current: u32, next: u32, percent: f64) -> String {
         format!("XP: {}/{} ({:.0}%)", current, next, percent)
     }
 
     pub fn rank_name(&self, level: u32) -> String {
-        let key = match level {
-            1..=9 => "game-rank-novice",
-            10..=19 => "game-rank-apprentice",
-            20..=29 => "game-rank-hacker",
-            30..=39 => "game-rank-elite",
-            _ => "game-rank-legend",
-        };
-        self.tc(key)
+        // Faixas vêm da fonte única `game::tier::Tier`.
+        self.tc(crate::game::tier::Tier::from_level(level).rank_key())
     }
 
     pub fn welcome_title(&self) -> String { self.tc("ui-welcome-title") }
@@ -142,12 +147,8 @@ impl I18n {
 
     pub fn art_tag(&self, mode: &str) -> String {
         let key = format!("game-art-{}-tag", mode.to_lowercase());
-        let val = self.t(&key, None);
-        if val.starts_with("[MISSING") {
-            format!("[{}]", mode.to_uppercase())
-        } else {
-            val
-        }
+        self.try_t(&key)
+            .unwrap_or_else(|| format!("[{}]", mode.to_uppercase()))
     }
 
     pub fn level_commands(&self, level: u32) -> Vec<(&'static str, String)> {
@@ -187,12 +188,71 @@ impl I18n {
     }
 
     pub fn command_hint(&self, cmd: &str) -> Option<String> {
-        let key = format!("hint-{}", cmd);
-        let val = self.t(&key, None);
-        if val.starts_with("[MISSING") {
-             None
-        } else {
-            Some(val)
+        self.try_t(&format!("hint-{}", cmd))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Chaves visíveis ao usuário introduzidas/externalizadas. O teste garante
+    /// que existem nos DOIS locales (e, de quebra, que os `.ftl` parseiam — um
+    /// erro de parse faria a chave cair no fallback `[MISSING: ...]`).
+    const REQUIRED_KEYS: &[&str] = &[
+        // patente
+        "ui-next-rank", "ui-max-rank",
+        // zona de perigo / confirmação
+        "ui-attention-max", "ui-command-detected", "ui-risk", "ui-data-loss",
+        "ui-unstable-system", "ui-irreversible-damage", "ui-available-actions",
+        "ui-cancel-rec", "ui-execute-anyway", "ui-backup-tip",
+        "sys-danger-confirm", "sys-danger-cancelled",
+        // alias
+        "sys-alias-none", "sys-alias-list-title", "sys-alias-removed", "sys-alias-missing",
+        "sys-alias-usage", "sys-alias-no-spaces", "sys-alias-created",
+        // tutorial
+        "sys-tutorial-ended", "sys-tutorial-none", "sys-tutorial-started",
+        "sys-tutorial-mode-title", "sys-tutorial-step-done-title",
+        "sys-tutorial-complete-title", "sys-tutorial-complete-body",
+        // benchmark
+        "sys-bench-none", "sys-bench-cancelled", "sys-bench-result-title",
+        "sys-bench-popup-title", "sys-bench-result", "sys-bench-start", "sys-bench-popup-body",
+        // ssh
+        "sys-error", "sys-ssh-disconnected", "sys-ssh-cd-ok", "sys-ssh-exec-error",
+        "sys-ssh-connecting", "sys-ssh-connected", "sys-ssh-conn-title", "sys-ssh-conn-body",
+        "sys-ssh-fail", "sys-ssh-fail-title", "sys-ssh-fail-body",
+        // comandos especiais / help
+        "sys-showing-stats", "sys-showing-quests", "sys-tip-title", "sys-tip-body",
+        "sys-tip-showing", "sys-help-cmd", "sys-help-showing-title", "sys-help-showing",
+        "help-system-title", "help-system-body",
+        // execução de comandos
+        "sys-cd-ok", "sys-cd-notfound", "sys-ls-listed", "sys-cmd-ok", "sys-cmd-error",
+        "sys-cmd-exec-error", "sys-quest-complete",
+        // level up / conquistas
+        "sys-levelup-title", "sys-levelup-body", "sys-achievement-title", "sys-achievement-announce",
+        // dicas educativas
+        "hint-err-rm-isdir", "hint-err-rmdir-notempty", "hint-err-cat-isdir",
+        "hint-err-cd-notdir", "hint-err-mkdir-dots", "hint-err-permission", "hint-err-notfound",
+        // avisos da zona de perigo
+        "danger-rm-root", "danger-rm-rf", "danger-rm", "danger-sudo", "danger-dd",
+        "danger-fs", "danger-perm", "danger-power", "danger-generic",
+        // diversos
+        "ui-top-processes", "ui-browse-hint", "ui-back-to-normal",
+        "sys-file-not-found", "sys-files-found",
+    ];
+
+    #[test]
+    fn all_required_keys_resolve_in_both_locales() {
+        for lang in [Language::PtBr, Language::EnUs] {
+            let i18n = I18n::new(lang);
+            for key in REQUIRED_KEYS {
+                let value = i18n.tc(key);
+                assert!(
+                    !value.starts_with("[MISSING"),
+                    "chave '{}' ausente/ilegível no locale {:?} (valor: {})",
+                    key, lang, value
+                );
+            }
         }
     }
 }

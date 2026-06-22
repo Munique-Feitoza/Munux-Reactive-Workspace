@@ -17,118 +17,93 @@ impl AchievementChecker {
         }
         
         let base_cmd = cmd_parts[0];
-        
+
         // Conquista: Primeiro Comando
         if game_state.total_commands == 1 && success {
-            return Self::unlock_if_new(game_state, "first_command", i18n, 10);
-        }
-
-        // Conquistas por comando específico
-        if success {
-            match base_cmd {
-                "ls" if !game_state.has_achievement("first_ls") => {
-                    return Self::unlock_if_new(game_state, "first_ls", i18n, 15);
-                },
-                "cd" if !game_state.has_achievement("first_cd") => {
-                    return Self::unlock_if_new(game_state, "first_cd", i18n, 15);
-                },
-                "touch" if !game_state.has_achievement("first_file") => {
-                    return Self::unlock_if_new(game_state, "first_file", i18n, 20);
-                },
-                "mkdir" if !game_state.has_achievement("first_dir") => {
-                    return Self::unlock_if_new(game_state, "first_dir", i18n, 20);
-                },
-                "cat" if !game_state.has_achievement("first_cat") => {
-                    return Self::unlock_if_new(game_state, "first_cat", i18n, 15);
-                },
-                "rm" if !game_state.has_achievement("first_rm") => {
-                    return Self::unlock_if_new(game_state, "first_rm", i18n, 25);
-                },
-                "sudo" if !game_state.has_achievement("first_sudo") => {
-                    return Self::unlock_if_new(game_state, "first_sudo", i18n, 50);
-                },
-                "pacman" | "yay" | "paru" if !game_state.has_achievement("first_pacman") => {
-                    return Self::unlock_if_new(game_state, "first_pacman", i18n, 40);
-                },
-                "apt" | "apt-get" if !game_state.has_achievement("first_apt") => {
-                    return Self::unlock_if_new(game_state, "first_apt", i18n, 40);
-                },
-                "git" if !game_state.has_achievement("first_git") => {
-                    return Self::unlock_if_new(game_state, "first_git", i18n, 35);
-                },
-                "systemctl" if !game_state.has_achievement("first_systemctl") => {
-                    return Self::unlock_if_new(game_state, "first_systemctl", i18n, 40);
-                },
-                _ => {}
+            if let Some(a) = Self::unlock_if_new(game_state, "first_command", i18n, 10) {
+                return Some(a);
             }
         }
-        
-        // SSH (check independente de sucesso)
-        if base_cmd == "ssh" && !game_state.has_achievement("first_ssh") {
-            return Self::unlock_if_new(game_state, "first_ssh", i18n, 45);
+
+        // Primeiro uso de cada comando (lista de aliases -> id -> xp). `unlock_if_new`
+        // já evita duplicar; usamos `if let` para não cortar os checks por
+        // quantidade quando a conquista de comando já estava desbloqueada.
+        if success {
+            const FIRST_USE: &[(&[&str], &str, u32)] = &[
+                (&["ls"], "first_ls", 15),
+                (&["cd"], "first_cd", 15),
+                (&["touch"], "first_file", 20),
+                (&["mkdir"], "first_dir", 20),
+                (&["cat"], "first_cat", 15),
+                (&["rm"], "first_rm", 25),
+                (&["sudo"], "first_sudo", 50),
+                (&["pacman", "yay", "paru"], "first_pacman", 40),
+                (&["apt", "apt-get"], "first_apt", 40),
+                (&["git"], "first_git", 35),
+                (&["systemctl"], "first_systemctl", 40),
+            ];
+            for (cmds, id, xp) in FIRST_USE {
+                if cmds.contains(&base_cmd) {
+                    if let Some(a) = Self::unlock_if_new(game_state, id, i18n, *xp) {
+                        return Some(a);
+                    }
+                    break;
+                }
+            }
         }
-        
-        // Conquistas por quantidade
-        match game_state.total_commands {
-            10 if !game_state.has_achievement("commands_10") => {
-                return Self::unlock_if_new(game_state, "commands_10", i18n, 30);
-            },
-            50 if !game_state.has_achievement("commands_50") => {
-                return Self::unlock_if_new(game_state, "commands_50", i18n, 100);
-            },
-            100 if !game_state.has_achievement("commands_100") => {
-                return Self::unlock_if_new(game_state, "commands_100", i18n, 200);
-            },
-            500 if !game_state.has_achievement("commands_500") => {
-                return Self::unlock_if_new(game_state, "commands_500", i18n, 500);
-            },
-            _ => {}
+
+        // SSH (independe de sucesso)
+        if base_cmd == "ssh" {
+            if let Some(a) = Self::unlock_if_new(game_state, "first_ssh", i18n, 45) {
+                return Some(a);
+            }
         }
-        
-        // Conquista: Pipe Master
-        if command.contains('|') && !game_state.has_achievement("pipe_master") {
-             return Self::unlock_if_new(game_state, "pipe_master", i18n, 30);
+
+        // Conquistas por quantidade (cada marco ocorre uma única vez)
+        let by_count = match game_state.total_commands {
+            10 => Some(("commands_10", 30)),
+            50 => Some(("commands_50", 100)),
+            100 => Some(("commands_100", 200)),
+            500 => Some(("commands_500", 500)),
+            _ => None,
+        };
+        if let Some((id, xp)) = by_count {
+            if let Some(a) = Self::unlock_if_new(game_state, id, i18n, xp) {
+                return Some(a);
+            }
         }
-        
+
+        // Pipe Master
+        if command.contains('|') {
+            return Self::unlock_if_new(game_state, "pipe_master", i18n, 30);
+        }
+
         None
     }
     
-    /// Verifica conquistas baseadas em streak
+    /// Verifica conquistas baseadas em streak. `unlock_if_new` já barra duplicatas,
+    /// então a guarda `has_achievement` foi removida.
     pub fn check_streak(game_state: &mut GameState, i18n: &I18n) -> Option<Achievement> {
-        match game_state.command_streak {
-            5 if !game_state.has_achievement("streak_5") => {
-                Self::unlock_if_new(game_state, "streak_5", i18n, 40)
-            },
-            10 if !game_state.has_achievement("streak_10") => {
-                Self::unlock_if_new(game_state, "streak_10", i18n, 80)
-            },
-            25 if !game_state.has_achievement("streak_25") => {
-                Self::unlock_if_new(game_state, "streak_25", i18n, 200)
-            },
-            _ => None
-        }
+        let (id, xp) = match game_state.command_streak {
+            5 => ("streak_5", 40),
+            10 => ("streak_10", 80),
+            25 => ("streak_25", 200),
+            _ => return None,
+        };
+        Self::unlock_if_new(game_state, id, i18n, xp)
     }
-    
-    /// Verifica conquistas de nível
+
+    /// Verifica conquistas de nível.
     pub fn check_level(game_state: &mut GameState, i18n: &I18n) -> Option<Achievement> {
-        match game_state.level {
-            5 if !game_state.has_achievement("level_5") => {
-                Self::unlock_if_new(game_state, "level_5", i18n, 100)
-            },
-            10 if !game_state.has_achievement("level_10") => {
-                Self::unlock_if_new(game_state, "level_10", i18n, 150)
-            },
-            20 if !game_state.has_achievement("level_20") => {
-                Self::unlock_if_new(game_state, "level_20", i18n, 250)
-            },
-            30 if !game_state.has_achievement("level_30") => {
-                Self::unlock_if_new(game_state, "level_30", i18n, 500)
-            },
-            50 if !game_state.has_achievement("level_50") => {
-                Self::unlock_if_new(game_state, "level_50", i18n, 1000)
-            },
-            _ => None
-        }
+        let (id, xp) = match game_state.level {
+            5 => ("level_5", 100),
+            10 => ("level_10", 150),
+            20 => ("level_20", 250),
+            30 => ("level_30", 500),
+            50 => ("level_50", 1000),
+            _ => return None,
+        };
+        Self::unlock_if_new(game_state, id, i18n, xp)
     }
     
     /// Conquistas de easter egg: a do próprio easter egg descoberto e, ao atingir
@@ -180,5 +155,57 @@ impl AchievementChecker {
         
         game_state.achievements.push(achievement.clone());
         Some(achievement)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::state::GameState;
+    use crate::i18n::{I18n, Language};
+
+    fn setup() -> (GameState, I18n) {
+        let i18n = I18n::new(Language::PtBr);
+        let gs = GameState::new(&i18n);
+        (gs, i18n)
+    }
+
+    #[test]
+    fn first_command_then_first_ls_unlock_in_order() {
+        let (mut gs, i18n) = setup();
+
+        gs.total_commands = 1;
+        assert!(AchievementChecker::check_command(&mut gs, "ls", true, &i18n).is_some());
+        assert!(gs.has_achievement("first_command"));
+
+        // Próximo `ls` (total != 1) desbloqueia a conquista específica do comando.
+        gs.total_commands = 2;
+        assert!(AchievementChecker::check_command(&mut gs, "ls -la", true, &i18n).is_some());
+        assert!(gs.has_achievement("first_ls"));
+    }
+
+    #[test]
+    fn achievements_never_unlock_twice() {
+        let (mut gs, i18n) = setup();
+        gs.total_commands = 5;
+        assert!(AchievementChecker::check_command(&mut gs, "git status", true, &i18n).is_some());
+        let count = gs.achievements.len();
+        // Repetir o mesmo comando não cria conquista duplicada.
+        assert!(AchievementChecker::check_command(&mut gs, "git log", true, &i18n).is_none());
+        assert_eq!(gs.achievements.len(), count);
+    }
+
+    #[test]
+    fn count_milestone_is_awarded_even_when_command_achievement_exists() {
+        let (mut gs, i18n) = setup();
+        // Pré-desbloqueia first_ls para forçar o fall-through até o marco de contagem.
+        gs.total_commands = 1;
+        let _ = AchievementChecker::check_command(&mut gs, "ls", true, &i18n); // first_command
+        gs.total_commands = 2;
+        let _ = AchievementChecker::check_command(&mut gs, "ls", true, &i18n); // first_ls
+        // 10º comando sendo `ls` (já tem first_ls) ainda deve conceder commands_10.
+        gs.total_commands = 10;
+        assert!(AchievementChecker::check_command(&mut gs, "ls", true, &i18n).is_some());
+        assert!(gs.has_achievement("commands_10"));
     }
 }

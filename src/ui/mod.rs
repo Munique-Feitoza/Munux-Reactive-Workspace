@@ -13,6 +13,22 @@ pub mod highlight;
 use crate::app::App;
 use ratatui::Frame;
 
+/// Bloco-painel padrão: bordas completas, título, cor da borda e fundo preto.
+/// Fonte única do estilo repetido em ~10 painéis. Quem precisa de extras
+/// (`title_bottom`, `border_type`, modificadores) encadeia sobre o retorno.
+pub fn panel_block(
+    title: String,
+    border: ratatui::style::Color,
+) -> ratatui::widgets::Block<'static> {
+    use ratatui::style::Style;
+    use ratatui::widgets::{Block, Borders};
+    Block::default()
+        .borders(Borders::ALL)
+        .title(title)
+        .border_style(Style::default().fg(border))
+        .style(Style::default().bg(ratatui::style::Color::Black))
+}
+
 /// Renderiza toda a interface do usuário
 pub fn render(frame: &mut Frame, app: &App) {
     // Renderiza background global

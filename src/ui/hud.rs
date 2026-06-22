@@ -62,14 +62,14 @@ pub fn render_hud(frame: &mut Frame, app: &App, area: Rect) {
     let info = Paragraph::new(info_text);
     frame.render_widget(info, chunks[0]);
     
-    // 2. Barra de XP
-    let xp_percent = ((app.game_state.xp as f64 / app.game_state.xp_to_next_level as f64) * 100.0) as u16;
+    // 2. Barra de XP (cálculo único e protegido contra divisão por zero)
+    let xp_pct = app.game_state.xp_progress();
     let xp_label = app.i18n.xp_label(
         app.game_state.xp,
         app.game_state.xp_to_next_level,
-        (app.game_state.xp as f64 / app.game_state.xp_to_next_level as f64) * 100.0
+        xp_pct,
     );
-    
+
     let xp_gauge = Gauge::default()
         .label(xp_label)
         .gauge_style(
@@ -77,17 +77,12 @@ pub fn render_hud(frame: &mut Frame, app: &App, area: Rect) {
                 .fg(theme.primary)
                 .add_modifier(Modifier::BOLD)
         )
-        .percent(xp_percent);
+        .percent(xp_pct as u16);
     
     frame.render_widget(xp_gauge, chunks[1]);
     
-    // 3. Integridade do Sistema
-    let integrity_color = match app.game_state.integrity {
-        80..=100 => Color::Green,
-        50..=79 => Color::Yellow,
-        20..=49 => Color::LightRed,
-        _ => Color::Red,
-    };
+    // 3. Integridade do Sistema (cor pela fonte única)
+    let integrity_color = crate::ui::theme::health_color(app.game_state.integrity);
     
     let integrity_text = Line::from(vec![
         Span::styled(

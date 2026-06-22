@@ -237,3 +237,193 @@ hint-mv = Move or rename file
 hint-ssh = Remote login
 hint-grep = Search text
 hint-systemctl = Manage services
+
+# Danger Zone and confirmation
+ui-attention-max = MAXIMUM ALERT
+ui-command-detected = Command detected
+ui-risk = Risk
+ui-data-loss = Irreversible data loss
+ui-unstable-system = System may become unstable
+ui-irreversible-damage = Damage that cannot be undone
+ui-available-actions = Available actions
+ui-cancel-rec = Cancel (recommended)
+ui-execute-anyway = Execute anyway
+ui-backup-tip = Back up before running destructive commands.
+sys-danger-confirm = ⚠️ Dangerous command. Type 'yes' and Enter to confirm, or ESC to cancel.
+sys-danger-cancelled = ✓ Dangerous command cancelled.
+
+# Rank progression
+ui-next-rank = 🎯 Next rank: { $rank } (level { $level })
+ui-max-rank = 🏆 Max rank reached!
+
+# Alias
+sys-alias-none = No aliases defined. Use: alias name='command'
+sys-alias-list-title = 📎 Defined aliases:
+sys-alias-removed = ✓ Alias '{ $name }' removed.
+sys-alias-missing = ✗ Alias '{ $name }' does not exist.
+sys-alias-usage = Usage: alias name='command'
+sys-alias-no-spaces = ✗ Alias name cannot contain spaces.
+sys-alias-created = ✓ Alias created: { $name } = { $value }
+
+# Tutorial
+sys-tutorial-ended = 🎓 Tutorial closed. Come back anytime: 'tutorial'.
+sys-tutorial-none = No tutorial in progress.
+sys-tutorial-started = 🎓 Tutorial started! Follow the instructions on the panel.
+sys-tutorial-mode-title = 🎓 Tutorial Mode
+sys-tutorial-step-done-title = ✅ Step complete!
+sys-tutorial-complete-title = 🎉 Tutorial complete!
+sys-tutorial-complete-body = Congratulations! You mastered the Munux basics.{ "" }
+    { "" }
+    +{ $xp } bonus XP!{ "" }
+    { "" }
+    Now explore freely — use 'help' whenever you need.
+
+# Benchmark
+sys-bench-none = No benchmark in progress.
+sys-bench-cancelled = ⏱️ Benchmark cancelled.
+sys-bench-result-title = ⏱️ Benchmark Result
+sys-bench-popup-title = ⏱️ Typing Benchmark
+sys-bench-result = ⏱️ { $seconds }s  •  { $wpm } WPM  •  { $accuracy }% accuracy  •  +{ $xp } XP
+sys-bench-start = ⏱️ TYPING BENCHMARK{ "" }
+    { "" }
+    Type the phrase below and press Enter:{ "" }
+    { "" }
+      { $phrase }{ "" }
+    { "" }
+    ('benchmark exit' cancels)
+sys-bench-popup-body = Type this phrase exactly and press Enter:{ "" }
+    { "" }
+    { $phrase }{ "" }
+    { "" }
+    The timer has already started! ('benchmark exit' to cancel)
+
+# SSH
+sys-error = ✗ Error: { $msg }
+sys-ssh-disconnected = 🔌 Disconnected from remote server.
+sys-ssh-cd-ok = ✓ Remote directory changed to: { $dir }
+sys-ssh-exec-error = ✗ Remote execution error: { $msg }
+sys-ssh-connecting = 🔄 Connecting to { $user }@{ $host }...
+sys-ssh-connected = ✓ Connected to { $host } at { $dir }
+sys-ssh-conn-title = Connection Established
+sys-ssh-conn-body = Successfully connected to { $user }@{ $host }{ "" }
+    { "" }
+    Directory: { $dir }
+sys-ssh-fail = ✗ Connection failed: { $msg }
+sys-ssh-fail-title = Connection Error
+sys-ssh-fail-body = Could not connect to { $target }:{ "" }
+    { $msg }
+
+# Special commands / help
+sys-showing-stats = ✓ Showing statistics
+sys-showing-quests = ✓ Showing active quests
+sys-tip-title = 💡 Tip of the Day
+sys-tip-body = Use the 'help' command to list all available commands.{ "" }
+    { "" }
+    Try 'stats' to see your progress!
+sys-tip-showing = Showing tip...
+sys-help-cmd = 📚 Command help: { $topic }
+sys-help-showing-title = 📚 Showing: { $title } (Press ESC to go back)
+sys-help-showing = 📚 Showing help (Press ESC to go back)
+help-system-title = Munux Help System
+help-system-body =
+    📚 MUNUX HELP SYSTEM
+
+    Use: help <distro>
+
+    Supported distributions:
+      help arch     - Manjaro, Arch Linux (pacman, yay, paru)
+      help debian   - Ubuntu, Debian, Mint (apt, dpkg, snap)
+      help fedora   - Fedora, RHEL, CentOS (dnf, rpm)
+      help opensuse - openSUSE (zypper)
+      help linux    - Universal Linux commands
+
+    Munux special commands:
+      stats         → Stats and progress
+      quests        → Active quests
+      achievements  → Unlocked achievements
+      tutorial      → Interactive tutorial for beginners
+      benchmark     → Typing speed test
+      alias n='cmd' → Create a command shortcut (unalias n removes)
+
+    Press ESC to return to normal mode.
+
+# Command execution (shell, cd, ls)
+sys-cd-ok = ✓ Directory changed to: { $dir }
+sys-cd-notfound = Directory not found: { $path }
+sys-ls-listed = 📂 Files listed in the right panel →
+sys-cmd-ok = ✓ Command executed successfully
+sys-cmd-error = ✗ Command execution error
+sys-cmd-exec-error = ✗ Error running command: { $msg }
+sys-quest-complete = { "" }
+    📋 QUEST COMPLETE!{ "" }
+    { $title }{ "" }
+    +{ $xp } XP
+
+# Level up / achievements
+sys-levelup-title = 🎉 LEVEL UP!
+sys-levelup-body = Level { $old } → { $new }{ "" }
+    { "" }
+    { $rank }{ "" }
+    { "" }
+    { $msg }
+sys-achievement-title = 🏆 Achievement Unlocked!
+sys-achievement-announce = 🏆 ACHIEVEMENT UNLOCKED!{ "" }
+    { "" }
+    { $name }{ "" }
+    { $desc }{ "" }
+    { "" }
+    +{ $xp } XP
+
+# Educational hints (text only; shell-output matchers stay in code)
+hint-err-rm-isdir = { "" }
+    { "" }
+    💡 TIP: 'rm' removes FILES.{ "" }
+       To remove directories use:{ "" }
+       - 'rmdir name'     (empty directory){ "" }
+       - 'rm -r name'     (directory with contents){ "" }
+       - 'rm -rf name'    (force removal - CAREFUL!)
+hint-err-rmdir-notempty = { "" }
+    { "" }
+    💡 TIP: 'rmdir' only removes EMPTY directories.{ "" }
+       To remove with contents use: 'rm -r name'
+hint-err-cat-isdir = { "" }
+    { "" }
+    💡 TIP: 'cat' shows the contents of FILES.{ "" }
+       To list directories use: 'ls name'
+hint-err-cd-notdir = { "" }
+    { "" }
+    💡 TIP: 'cd' navigates into DIRECTORIES.{ "" }
+       To open files use: 'cat name' or 'nano name'
+hint-err-mkdir-dots = { "" }
+    { "" }
+    💡 TIP: 'mkdir' creates DIRECTORIES (folders).{ "" }
+       To create files use:{ "" }
+       - 'touch file.txt'             (empty file){ "" }
+       - 'echo "text" > file.txt'     (file with content)
+hint-err-permission = { "" }
+    { "" }
+    💡 TIP: You don't have permission.{ "" }
+       Try 'sudo' before the command (careful!)
+hint-err-notfound = { "" }
+    { "" }
+    💡 TIP: Command does not exist or is not installed.{ "" }
+       - Check that you typed it correctly{ "" }
+       - Use 'which command' to verify it exists
+
+# Danger zone warnings (shown in the DangerZone panel)
+danger-rm-root = RECURSIVE DELETE ON ROOT DIRECTORY!
+danger-rm-rf = Recursive, forced file deletion
+danger-rm = File deletion - irreversible operation
+danger-sudo = Execution with superuser privileges
+danger-dd = Low-level copy - may overwrite data
+danger-fs = Partition/filesystem modification
+danger-perm = File permission/ownership modification
+danger-power = System shutdown/restart
+danger-generic = Potentially destructive command detected
+
+# Misc
+ui-top-processes = Top processes (CPU)
+ui-browse-hint = ↑↓ navigate • Enter open
+ui-back-to-normal = Back to normal mode
+sys-file-not-found = ❌ File '{ $name }' not found
+sys-files-found = 💡 Files found:

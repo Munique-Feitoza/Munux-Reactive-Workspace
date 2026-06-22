@@ -351,3 +351,74 @@ pub fn generate_quests_for_level(level: u32, i18n: &I18n) -> Vec<Quest> {
 
     quests
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn quest(objective: QuestObjective) -> Quest {
+        Quest {
+            id: "t".to_string(),
+            title: "t".to_string(),
+            description: "t".to_string(),
+            objective,
+            xp_reward: 10,
+            completed: false,
+        }
+    }
+
+    #[test]
+    fn execute_command_completes_on_matching_prefix() {
+        let mut q = quest(QuestObjective::ExecuteCommand {
+            command: "ls".to_string(),
+            count: 1,
+            current: 0,
+        });
+        assert!(q.update_progress("ls -la", 1));
+        assert!(q.completed);
+    }
+
+    #[test]
+    fn execute_command_ignores_non_matching() {
+        let mut q = quest(QuestObjective::ExecuteCommand {
+            command: "ls".to_string(),
+            count: 1,
+            current: 0,
+        });
+        assert!(!q.update_progress("cd /tmp", 1));
+        assert!(!q.completed);
+    }
+
+    #[test]
+    fn execute_any_commands_counts_up_to_target() {
+        let mut q = quest(QuestObjective::ExecuteAnyCommands { count: 3, current: 0 });
+        assert!(!q.update_progress("ls", 1));
+        assert!(!q.update_progress("pwd", 1));
+        assert!(q.update_progress("cd x", 1)); // 3º comando completa
+        assert!(q.completed);
+    }
+
+    #[test]
+    fn reach_level_completes_at_threshold() {
+        let mut q = quest(QuestObjective::ReachLevel { level: 5 });
+        assert!(!q.update_progress("seja o que for", 4));
+        assert!(q.update_progress("seja o que for", 5));
+        assert!(q.completed);
+    }
+
+    #[test]
+    fn pipe_and_git_are_detected() {
+        let mut p = quest(QuestObjective::UsePipe { done: false });
+        assert!(p.update_progress("ps aux | grep init", 1));
+
+        let mut g = quest(QuestObjective::UseGit { done: false });
+        assert!(g.update_progress("git status", 1));
+    }
+
+    #[test]
+    fn completion_triggers_only_once() {
+        let mut q = quest(QuestObjective::UseGit { done: false });
+        assert!(q.update_progress("git status", 1)); // transição -> true
+        assert!(!q.update_progress("git log", 1)); // já completa -> false
+    }
+}

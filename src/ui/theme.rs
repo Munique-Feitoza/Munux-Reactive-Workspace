@@ -4,6 +4,31 @@
 use ratatui::style::Color;
 use crate::game::state::GameState;
 
+/// Cor por nível de saúde (alto = bom): usada para integridade. Verde ≥80,
+/// amarelo ≥50, laranja ≥20, vermelho abaixo. Fonte única — antes o HUD (4 faixas)
+/// e o painel de stats (3 faixas) divergiam (ex.: integridade=30 dava cores diferentes).
+pub fn health_color(pct: u8) -> Color {
+    if pct >= 80 {
+        Color::Green
+    } else if pct >= 50 {
+        Color::Yellow
+    } else if pct >= 20 {
+        Color::LightRed
+    } else {
+        Color::Red
+    }
+}
+
+/// Cor por nível de carga (alto = ruim): usada para CPU e RAM. Vermelho acima de
+/// 80%, ciano caso contrário.
+pub fn load_color(pct: f32) -> Color {
+    if pct > 80.0 {
+        Color::Red
+    } else {
+        Color::Cyan
+    }
+}
+
 /// Tema visual progressivo baseado no nível
 #[derive(Debug, Clone, Copy)]
 pub struct Theme {
@@ -74,8 +99,8 @@ impl Theme {
                 text: Color::Rgb(255, 128, 255),
             },
             
-            // Níveis 30-49: Tema Elite (Roxo e vermelho)
-            30..=49 => Self {
+            // Níveis 30-39: Tema Elite (Roxo e vermelho) — alinhado à patente Elite
+            30..=39 => Self {
                 primary: Color::Rgb(128, 0, 255),
                 secondary: Color::Rgb(255, 0, 128),
                 accent: Color::Rgb(200, 0, 255),
@@ -119,7 +144,7 @@ impl Theme {
             5..=9 => "►",
             10..=19 => "▶",
             20..=29 => "◆",
-            30..=49 => "⬢",
+            30..=39 => "⬢",
             _ => "⬣",
         }
     }
@@ -132,7 +157,7 @@ impl Theme {
             5..=9 => BorderType::Rounded,
             10..=19 => BorderType::Thick,
             20..=29 => BorderType::Double,
-            30..=49 => BorderType::Thick, // Repetido pois não temos muitos tipos padrão
+            30..=39 => BorderType::Thick, // Repetido pois não temos muitos tipos padrão
             _ => BorderType::Thick,
         }
     }
@@ -184,8 +209,8 @@ impl Theme {
                 "   \\___)≡(___/".to_string(),
             ],
             
-            // 30-49: Tux Elite
-            30..=49 => vec![
+            // 30-39: Tux Elite (alinhado à patente Elite)
+            30..=39 => vec![
                 "  ▓▓▀▄▀▄.--.".to_string(),
                 format!("  ▓▓▄▀▄|◉‿◉|  {}", i18n.art_tag("elite")),
                 "  ▓▓  |:≈/ |".to_string(),

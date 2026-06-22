@@ -5,15 +5,17 @@
 pub struct DistroGuide;
 
 impl DistroGuide {
-    /// Retorna um guia completo de comandos para a distro
-    pub fn get_guide(distro: &str) -> String {
+    /// Retorna `(conteúdo, título)` do guia da distro. Fonte única: antes o
+    /// conteúdo (aqui) e o título (em `app.rs`) eram mapeados separadamente e
+    /// divergiam — `help manjaro/mint/rhel/centos` mostrava o guia certo com
+    /// título errado.
+    pub fn get(distro: &str) -> (String, &'static str) {
         match distro.to_lowercase().as_str() {
-            "manjaro" | "arch" => Self::arch_guide(),
-            "ubuntu" | "debian" | "mint" => Self::debian_guide(),
-            "fedora" | "rhel" | "centos" => Self::fedora_guide(),
-            "opensuse" => Self::opensuse_guide(),
-            "all" | "geral" => Self::general_guide(),
-            _ => Self::general_guide(),
+            "manjaro" | "arch" => (Self::arch_guide(), "Guia Manjaro/Arch Linux"),
+            "ubuntu" | "debian" | "mint" => (Self::debian_guide(), "Guia Ubuntu/Debian/Mint"),
+            "fedora" | "rhel" | "centos" => (Self::fedora_guide(), "Guia Fedora/RHEL/CentOS"),
+            "opensuse" => (Self::opensuse_guide(), "Guia openSUSE"),
+            _ => (Self::general_guide(), "Guia Linux Universal"),
         }
     }
     

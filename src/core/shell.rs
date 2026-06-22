@@ -25,34 +25,14 @@ impl ShellExecutor {
         
         Ok(CommandOutput::from_output(output))
     }
-    
-    /// Verifica se um comando existe no PATH
-    #[allow(dead_code)]
-    pub fn command_exists(command: &str) -> bool {
-        if cfg!(target_os = "windows") {
-            Command::new("where")
-                .arg(command)
-                .output()
-                .map(|output| output.status.success())
-                .unwrap_or(false)
-        } else {
-            Command::new("which")
-                .arg(command)
-                .output()
-                .map(|output| output.status.success())
-                .unwrap_or(false)
-        }
-    }
 }
 
 /// Resultado da execução de um comando
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct CommandOutput {
     pub stdout: String,
     pub stderr: String,
     pub success: bool,
-    pub exit_code: i32,
 }
 
 impl CommandOutput {
@@ -61,7 +41,6 @@ impl CommandOutput {
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
             stderr: String::from_utf8_lossy(&output.stderr).to_string(),
             success: output.status.success(),
-            exit_code: output.status.code().unwrap_or(-1),
         }
     }
     

@@ -45,15 +45,23 @@ pub fn restore() -> Result<()> {
     Ok(())
 }
 
-/// RAII guard que garante que o terminal será restaurado
-#[allow(dead_code)]
-pub struct TerminalGuard;
+/// RAII guard que **possui** o terminal e garante a restauração no `Drop`.
+///
+/// Cobre todos os caminhos de saída — retorno normal, early-return via `?`
+/// (ex.: `App::new()` falhar após o `init`) e desempilhamento por panic —,
+/// fechando o gap em que o terminal ficava corrompido em raw mode.
+pub struct TerminalGuard {
+    terminal: Tui,
+}
 
 impl TerminalGuard {
-    #[allow(dead_code)]
     pub fn new() -> Result<Self> {
-        init()?;
-        Ok(Self)
+        Ok(Self { terminal: init()? })
+    }
+
+    /// Acesso mutável ao terminal subjacente (para o loop de render).
+    pub fn terminal(&mut self) -> &mut Tui {
+        &mut self.terminal
     }
 }
 

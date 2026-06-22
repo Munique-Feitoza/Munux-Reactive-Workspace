@@ -34,26 +34,46 @@ pub fn render_stats_panel(frame: &mut Frame, app: &App, area: Rect) {
         .split(inner);
     
     // Estatísticas gerais
-    render_general_stats(frame, &app.game_state, &app.i18n, chunks[0]);
+    render_general_stats(frame, &app.game_state, &app.i18n, &app.system_summary, chunks[0]);
     
     // Conquistas recentes
     render_recent_achievements(frame, &app.game_state, &app.i18n, chunks[1]);
 }
 
-fn render_general_stats(frame: &mut Frame, game_state: &GameState, i18n: &crate::i18n::I18n, area: Rect) {
+fn render_general_stats(
+    frame: &mut Frame,
+    game_state: &GameState,
+    i18n: &crate::i18n::I18n,
+    summary: &crate::core::monitor::SystemSummary,
+    area: Rect,
+) {
     let theme = game_state.get_theme();
-    use crate::core::monitor::SystemMonitor;
-    
+
     let success_rate = game_state.success_rate();
-    
-    // Captura informações do sistema
-    let mut monitor = SystemMonitor::new();
-    let cpu = monitor.get_cpu_usage();
-    let (mem_used, mem_total) = monitor.get_memory_info();
-    let mem_percent = (mem_used as f64 / mem_total as f64 * 100.0) as f32;
-    
+
+    // Informações do sistema vêm do monitor persistente (atualizado no update).
+    let cpu = summary.cpu_usage;
+    let mem_percent = summary.memory_percent;
+
+    // Progressão de patente (fonte única `game::tier::Tier`): mostra para onde a
+    // pessoa está indo — a próxima patente e em que nível ela chega.
+    let tier = crate::game::tier::Tier::from_level(game_state.level);
+    let next_rank = match tier.next() {
+        Some(next) => {
+            let mut args = fluent::FluentArgs::new();
+            args.set("rank", i18n.tc(next.rank_key()));
+            args.set("level", next.min_level());
+            i18n.t("ui-next-rank", Some(&args))
+        }
+        None => i18n.tc("ui-max-rank"),
+    };
+
     let lines = vec![
         Line::from(""),
+        Line::from(vec![Span::styled(
+            next_rank,
+            Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
+        )]),
         Line::from(vec![
             Span::styled(format!("⚡ {}: ", i18n.tc("ui-total-commands")), Style::default().fg(Color::Gray)),
             Span::styled(
@@ -96,11 +116,8 @@ fn render_general_stats(frame: &mut Frame, game_state: &GameState, i18n: &crate:
             Span::styled(format!("💚 {}: ", i18n.tc("ui-integrity")), Style::default().fg(Color::Gray)),
             Span::styled(
                 format!("{}%", game_state.integrity),
-                Style::default().fg(
-                    if game_state.integrity >= 80 { Color::Green }
-                    else if game_state.integrity >= 50 { Color::Yellow }
-                    else { Color::Red }
-                ).add_modifier(Modifier::BOLD),
+                Style::default().fg(crate::ui::theme::health_color(game_state.integrity))
+                    .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(""),
@@ -108,13 +125,13 @@ fn render_general_stats(frame: &mut Frame, game_state: &GameState, i18n: &crate:
             Span::styled("💻 CPU: ", Style::default().fg(Color::Gray)),
             Span::styled(
                 format!("{:.1}%", cpu),
-                Style::default().fg(if cpu > 80.0 { Color::Red } else { Color::Cyan }),
+                Style::default().fg(crate::ui::theme::load_color(cpu)),
             ),
             Span::styled(" | ", Style::default().fg(Color::DarkGray)),
             Span::styled("🧠 RAM: ", Style::default().fg(Color::Gray)),
             Span::styled(
                 format!("{:.1}%", mem_percent),
-                Style::default().fg(if mem_percent > 80.0 { Color::Red } else { Color::Cyan }),
+                Style::default().fg(crate::ui::theme::load_color(mem_percent)),
             ),
         ]),
         Line::from(vec![

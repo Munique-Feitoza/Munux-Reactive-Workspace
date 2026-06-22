@@ -11,16 +11,6 @@
 
 use std::path::Path;
 
-/// Comandos internos/especiais do Munux que sempre aparecem na completação.
-const BUILTIN_COMMANDS: &[&str] = &[
-    "help", "stats", "quests", "missions", "achievements", "xp", "clear", "exit",
-    "alias", "unalias", "tip", "tutorial", "benchmark",
-    "cd", "ls", "ll", "la", "pwd", "cat", "less", "grep", "find", "git", "ssh",
-    "mkdir", "touch", "cp", "mv", "rm", "rmdir", "top", "htop", "ps", "df", "du",
-    "ping", "curl", "wget", "tar", "zip", "unzip", "sudo", "systemctl", "cowsay",
-    "fortune", "matrix",
-];
-
 /// Resultado de uma tentativa de completação.
 pub struct Completion {
     /// Novo conteúdo do buffer de input (igual ao original se nada mudou).
@@ -86,7 +76,7 @@ fn command_candidates(partial: &str) -> Vec<String> {
         }
     };
 
-    for c in BUILTIN_COMMANDS {
+    for c in crate::core::commands::names() {
         push(c);
     }
 

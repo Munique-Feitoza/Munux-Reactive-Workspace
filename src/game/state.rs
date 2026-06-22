@@ -125,46 +125,20 @@ impl GameState {
         self.integrity = (self.integrity + amount).min(100);
     }
     
-    /// Adiciona uma conquista
-    #[allow(dead_code)]
-    pub fn unlock_achievement(&mut self, id: String, name: String, description: String, xp_reward: u32) {
-        // Verifica se já foi desbloqueada
-        if self.achievements.iter().any(|a| a.id == id) {
-            return;
-        }
-        
-        let achievement = Achievement {
-            id,
-            name,
-            description,
-            unlocked_at: Utc::now(),
-            xp_reward,
-        };
-        
-        self.achievements.push(achievement);
-        self.add_xp(xp_reward);
-    }
-    
     /// Retorna o título/rank baseado no nível
     pub fn get_rank(&self, i18n: &crate::i18n::I18n) -> String {
         i18n.rank_name(self.level)
     }
-    
-    /// Retorna a cor do nível (para o prompt)
-    #[allow(dead_code)]
-    pub fn get_level_color(&self) -> ratatui::style::Color {
-        use ratatui::style::Color;
-        
-        match self.level {
-            1..=4 => Color::White,
-            5..=9 => Color::Green,
-            10..=19 => Color::Cyan,
-            20..=29 => Color::Blue,
-            30..=49 => Color::Magenta,
-            _ => Color::LightMagenta,
+
+    /// Progresso de XP rumo ao próximo nível, em `0.0..=100.0`.
+    /// Protege contra divisão por zero (`xp_to_next_level == 0` => 100%).
+    pub fn xp_progress(&self) -> f64 {
+        if self.xp_to_next_level == 0 {
+            return 100.0;
         }
+        ((self.xp as f64 / self.xp_to_next_level as f64) * 100.0).clamp(0.0, 100.0)
     }
-    
+
     /// Incrementa o contador de comandos
     pub fn increment_commands(&mut self) {
         self.total_commands += 1;
@@ -233,5 +207,82 @@ impl GameState {
 impl Default for GameState {
     fn default() -> Self {
         Self::new(&crate::i18n::I18n::new(crate::i18n::Language::PtBr))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn state() -> GameState {
+        GameState::default()
+    }
+
+    #[test]
+    fn add_xp_levels_up_and_carries_over() {
+        let mut s = state();
+        assert_eq!((s.level, s.xp_to_next_level), (1, 100));
+        assert!(s.add_xp(100));
+        assert_eq!(s.level, 2);
+        assert_eq!(s.xp, 0);
+        assert_eq!(s.xp_to_next_level, 120); // +20% por nível
+    }
+
+    #[test]
+    fn add_xp_below_threshold_does_not_level() {
+        let mut s = state();
+        assert!(!s.add_xp(50));
+        assert_eq!(s.level, 1);
+        assert_eq!(s.xp, 50);
+    }
+
+    #[test]
+    fn level_five_disables_safe_mode() {
+        let mut s = state();
+        assert!(s.safe_mode);
+        for _ in 0..4 {
+            let need = s.xp_to_next_level;
+            s.add_xp(need);
+        }
+        assert_eq!(s.level, 5);
+        assert!(!s.safe_mode);
+    }
+
+    #[test]
+    fn streak_resets_on_failure_and_success_rate_is_correct() {
+        let mut s = state();
+        s.increment_commands();
+        s.record_success();
+        s.increment_commands();
+        s.record_success();
+        assert_eq!(s.command_streak, 2);
+        assert_eq!(s.successful_commands, 2);
+
+        s.increment_commands();
+        s.record_failure();
+        assert_eq!(s.command_streak, 0);
+        assert_eq!(s.failed_commands, 1);
+
+        assert!((s.success_rate() - 66.666).abs() < 0.1); // 2/3
+    }
+
+    #[test]
+    fn success_rate_zero_when_no_commands() {
+        assert_eq!(state().success_rate(), 0.0);
+    }
+
+    #[test]
+    fn daily_streak_increments_next_day_and_resets_after_gap() {
+        let mut s = state();
+
+        s.daily_streak = 3;
+        s.last_session = Utc::now() - chrono::Duration::days(1);
+        s.update_daily_streak();
+        assert_eq!(s.daily_streak, 4, "dia seguinte deve incrementar");
+
+        s.daily_streak = 3;
+        s.last_session = Utc::now() - chrono::Duration::days(5);
+        s.update_daily_streak();
+        assert_eq!(s.daily_streak, 1, "lacuna > 1 dia deve reiniciar");
     }
 }

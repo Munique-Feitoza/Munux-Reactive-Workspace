@@ -5,7 +5,7 @@
 name = "munux-reactive-workspace"
 version = "0.2.0"
 edition = "2021"
-authors = ["Munique Alves Pacheco Feitoza <munique.feitoza@example.com>"]
+authors = ["Munique Alves Pacheco Feitoza"]
 license = "GPL-3.0"
 description = "A next-generation reactive terminal environment for education and productivity"
 repository = "https://github.com/Munique-Feitoza/Munux-Reactive-Workspace"

@@ -14,11 +14,8 @@ use std::fs;
 
 /// Renderiza o painel direito reativo (o "camaleão")
 pub fn render_reactive_panel(frame: &mut Frame, app: &App, area: Rect) {
-    use ratatui::widgets::Clear;
-    
-    // Limpa área para evitar ghosting
-    frame.render_widget(Clear, area);
-
+    // O `Clear` global (ui::render) já evita ghosting; um segundo Clear aqui
+    // apagaria o background do tema neste painel. Por isso não limpamos de novo.
     match &app.right_panel_mode {
         RightPanelMode::Welcome => render_welcome_screen(frame, app, area),
         RightPanelMode::FileTree { path } => {
@@ -80,59 +77,63 @@ fn render_file_tree_with_hint(frame: &mut Frame, path: &std::path::Path, input: 
 }
 
 /// Renderiza a árvore de arquivos
-fn render_file_tree(frame: &mut Frame, path: &std::path::Path, app: &App, area: Rect) {
+fn render_file_tree(frame: &mut Frame, _path: &std::path::Path, app: &App, area: Rect) {
     use crate::core::filesystem::FileSystemManager;
-    
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" 📂 {} ", app.i18n.navigation_title()))
-        .border_style(Style::default().fg(Color::Cyan))
-        .style(Style::default().bg(Color::Black));
-    
+
+    let browsing = app.is_browsing_files();
+    let mut block =
+        crate::ui::panel_block(format!(" 📂 {} ", app.i18n.navigation_title()), Color::Cyan);
+    if browsing {
+        block = block.title_bottom(format!(" {} ", app.i18n.tc("ui-browse-hint")));
+    }
+
     let mut items = Vec::new();
-    
-    // Adiciona o diretório pai
+
+    // Diretório pai (referência visual; não selecionável)
     items.push(ListItem::new(Line::from(vec![
+        Span::raw("  "),
         Span::styled("📁 ", Style::default().fg(Color::Yellow)),
         Span::raw(".."),
     ])));
-    
-    // Lista arquivos e diretórios usando FileSystemManager
-    if let Ok(entries) = FileSystemManager::list_directory(path) {
-        for entry in entries.iter().take(20) { // Limita a 20 itens
+
+    // Lista compartilhada com a navegação (mesma ordem e limite).
+    let entries = app.dir_entries();
+    if entries.is_empty() && FileSystemManager::list_directory(&app.current_dir).is_err() {
+        items.push(ListItem::new(Line::from(vec![
+            Span::styled("⚠ ", Style::default().fg(Color::Red)),
+            Span::raw(app.i18n.tc("ui-err-read-dir")),
+        ])));
+    } else {
+        for (i, entry) in entries.iter().enumerate() {
             let icon = entry.get_icon();
             let color = if entry.is_dir {
                 Color::Yellow
             } else {
-                match entry.name.rsplit('.').next() {
-                    Some("rs") => Color::LightRed,
-                    Some("sh") => Color::Green,
-                    Some("toml") | Some("json") => Color::Blue,
-                    Some("md") => Color::Cyan,
-                    Some("py") => Color::Yellow,
-                    _ => Color::White,
-                }
+                crate::core::filetype::classify(&entry.name).color
             };
-            
+
             let size_str = if !entry.is_dir {
                 format!(" ({})", FileSystemManager::format_size(entry.size))
             } else {
                 String::new()
             };
-            
+
+            let selected = browsing && i == app.file_selection;
+            let name_style = if selected {
+                Style::default().fg(color).add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            } else {
+                Style::default().fg(color)
+            };
+
             items.push(ListItem::new(Line::from(vec![
+                Span::styled(if selected { "▶ " } else { "  " }, Style::default().fg(Color::Cyan)),
                 Span::styled(format!("{} ", icon), Style::default().fg(color)),
-                Span::raw(entry.name.clone()),
+                Span::styled(entry.name.clone(), name_style),
                 Span::styled(size_str, Style::default().fg(Color::DarkGray)),
             ])));
         }
-    } else {
-        items.push(ListItem::new(Line::from(vec![
-            Span::styled("⚠ ", Style::default().fg(Color::Red)),
-            Span::raw(app.i18n.tc("ui-err-read-dir")),
-        ])));
     }
-    
+
     let list = List::new(items).block(block);
     frame.render_widget(list, area);
 }
@@ -152,11 +153,10 @@ fn render_file_preview(
 
     // Preview com realce de sintaxe para linguagens suportadas.
     if !content.is_empty() && crate::ui::highlight::is_supported(language) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(format!(" 📄 {} [{}] ", app.i18n.preview_title(filename), language))
-            .border_style(Style::default().fg(Color::Green))
-            .style(Style::default().bg(Color::Black));
+        let block = crate::ui::panel_block(
+            format!(" 📄 {} [{}] ", app.i18n.preview_title(filename), language),
+            Color::Green,
+        );
 
         let lines = crate::ui::highlight::highlight(content, language);
         let paragraph = Paragraph::new(lines)
@@ -167,11 +167,10 @@ fn render_file_preview(
         return;
     }
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" 📄 {} ", app.i18n.preview_title(filename)))
-        .border_style(Style::default().fg(Color::Green))
-        .style(Style::default().bg(Color::Black));
+    let block = crate::ui::panel_block(
+        format!(" 📄 {} ", app.i18n.preview_title(filename)),
+        Color::Green,
+    );
 
     // Preview com tratamento de erro melhorado e sugestões
     let text = if !content.is_empty() {
@@ -181,27 +180,11 @@ fn render_file_preview(
         args.set("name", filename);
         format!("{}\n\n{}", app.i18n.t("ui-err-is-dir", Some(&args)), app.i18n.t("ui-err-is-dir-hint", Some(&args)))
     } else if !path.exists() {
-        // Busca arquivos similares
-        let mut suggestions = Vec::new();
-        
-        if let Ok(entries) = std::fs::read_dir(".") {
-            for entry in entries.flatten() {
-                if let Some(name) = entry.file_name().to_str() {
-                    if name.starts_with(filename) || name.contains(filename) {
-                        suggestions.push(name.to_string());
-                    }
-                }
-            }
-        }
-        
-        let mut msg = format!("❌ Arquivo '{}' não encontrado\n\n", filename);
-        if !suggestions.is_empty() {
-            msg.push_str("💡 Você quis dizer:\n\n");
-            for sugg in suggestions.iter().take(5) {
-                msg.push_str(&format!("  → {}\n", sugg));
-            }
-        }
-        msg
+        // Sugestões de arquivos similares são geradas no update (parser, no
+        // diretório lógico correto) e chegam prontas em `content`. Aqui é só um
+        // fallback simples — sem varrer o diretório do processo (que após `cd`
+        // estaria errado).
+        format!("❌ Arquivo '{}' não encontrado", filename)
     } else if let Ok(file_content) = fs::read_to_string(path) {
         let lines: Vec<&str> = file_content.lines().take(30).collect();
         if lines.is_empty() {
@@ -231,12 +214,11 @@ fn render_resource_monitor(
     app: &App,
     area: Rect,
 ) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" 📊 {} ", app.i18n.resource_title()))
-        .border_style(Style::default().fg(Color::Blue))
-        .style(Style::default().bg(Color::Black));
-    
+    let block = crate::ui::panel_block(
+        format!(" 📊 {} ", app.i18n.resource_title()),
+        Color::Blue,
+    );
+
     // Divide em seções
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -249,35 +231,50 @@ fn render_resource_monitor(
     
     frame.render_widget(block, area);
     
-    // CPU Gauge
+    // CPU Gauge (clamp em 100: Gauge::percent dá panic se passar de 100)
     let cpu_gauge = Gauge::default()
         .block(Block::default().title(app.i18n.cpu_usage_label()))
         .gauge_style(Style::default().fg(Color::Cyan))
-        .percent(cpu_usage as u16);
+        .percent((cpu_usage as u16).min(100));
     frame.render_widget(cpu_gauge, chunks[0]);
-    
-    // Memory Gauge
-    let mem_percent = if memory_total > 0 {
-        ((memory_used as f64 / memory_total as f64) * 100.0) as u16
-    } else {
-        0
-    };
+
+    // Memory Gauge (cálculo único e protegido contra divisão por zero)
+    let mem_percent = crate::core::monitor::mem_percent(memory_used, memory_total) as u16;
     let mem_gauge = Gauge::default()
         .block(Block::default().title(app.i18n.tc("ui-memory")))
         .gauge_style(Style::default().fg(Color::Yellow))
-        .percent(mem_percent);
+        .percent(mem_percent.min(100));
     frame.render_widget(mem_gauge, chunks[1]);
     
-    // Informações adicionais
-    let info = Paragraph::new(format!(
-        "{}: {}\n{}: {} / {} MB",
-        app.i18n.tc("ui-processes"),
-        process_count,
-        app.i18n.tc("ui-memory"),
-        memory_used / 1024 / 1024,
-        memory_total / 1024 / 1024
-    ));
-    frame.render_widget(info, chunks[2]);
+    // Informações + Top-5 processos por uso de CPU.
+    let mut info_lines = vec![
+        Line::from(format!(
+            "{}: {}    {}: {} / {} MB",
+            app.i18n.tc("ui-processes"),
+            process_count,
+            app.i18n.tc("ui-memory"),
+            memory_used / 1024 / 1024,
+            memory_total / 1024 / 1024
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            app.i18n.tc("ui-top-processes"),
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        )),
+    ];
+    for p in app.system_summary.top_processes.iter().take(5) {
+        let name: String = p.name.chars().take(14).collect();
+        info_lines.push(Line::from(vec![
+            Span::styled(format!("{:>7} ", p.pid), Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{:<14} ", name), Style::default().fg(Color::White)),
+            Span::styled(format!("{:>5.1}% ", p.cpu_usage), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("{:>6} MB", p.memory / 1024 / 1024),
+                Style::default().fg(Color::Yellow),
+            ),
+        ]));
+    }
+    frame.render_widget(Paragraph::new(info_lines), chunks[2]);
 }
 
 /// Renderiza a zona de perigo
@@ -397,7 +394,7 @@ fn render_danger_zone(
         Line::from(vec![
             Span::raw("   "),
             Span::styled(
-                "[ Enter ]",
+                "[ sim+Enter ]",
                 Style::default()
                     .fg(Color::Red)
                     .add_modifier(Modifier::BOLD | Modifier::REVERSED),
@@ -437,12 +434,11 @@ fn render_gamification(
     app: &App,
     area: Rect,
 ) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" 🎮 {} ", app.i18n.level_up_title()))
-        .border_style(Style::default().fg(Color::Magenta))
-        .style(Style::default().bg(Color::Black));
-    
+    let block = crate::ui::panel_block(
+        format!(" 🎮 {} ", app.i18n.level_up_title()),
+        Color::Magenta,
+    );
+
     let icon = if celebration { "🎉" } else { "⭐" };
     
     let text = vec![
@@ -500,12 +496,8 @@ fn render_welcome_screen(frame: &mut Frame, app: &App, area: Rect) {
     let character_lines = Theme::get_character_art(level, &app.i18n);
     
     let title = format!(" Munux - {} [Nv {}] ", rank, level);
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(title)
-        .border_style(Style::default().fg(theme.border))
-        .style(Style::default().bg(Color::Black));
-    
+    let block = crate::ui::panel_block(title, theme.border);
+
     let mut text = vec![Line::from("")];
     
     // Renderiza o personagem com as cores do tema
@@ -677,14 +669,14 @@ fn render_help_panel(frame: &mut Frame, content: &str, title: &str, app: &App, a
         .borders(Borders::ALL)
         .title(format!(" 📚 {} ", title))
         .border_style(Style::default().fg(Color::Cyan))
-        .title_bottom(format!(" {} ", app.i18n.esc_to_back()));
-    
+        .title_bottom(format!(" {}  ·  {} ", app.i18n.esc_to_back(), app.i18n.scroll_hint()));
+
     let paragraph = Paragraph::new(content)
         .block(block)
         .wrap(Wrap { trim: false })
         .style(Style::default().fg(Color::Gray))
-        .scroll((0, 0)); // Futuramente pode adicionar scroll
-    
+        .scroll((app.scroll, 0)); // PageUp/PageDown e roda do mouse controlam app.scroll
+
     frame.render_widget(paragraph, area);
 }
 

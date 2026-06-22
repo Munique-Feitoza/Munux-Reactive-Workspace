@@ -15,4 +15,3 @@ Thumbs.db
 
 # Munux specific
 *.munux_save.json
-/data/*.json

@@ -2,6 +2,7 @@
 // License: GPLv3
 
 pub mod state;
+pub mod tier;
 pub mod logic;
 pub mod achievements;
 pub mod quests;
