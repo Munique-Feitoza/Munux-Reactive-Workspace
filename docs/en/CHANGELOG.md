@@ -4,7 +4,7 @@ All notable changes to Munux Reactive Workspace will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-![Version](https://img.shields.io/badge/Latest-v0.2.0-blue) ![Status](https://img.shields.io/badge/Status-Beta-yellow)
+![Version](https://img.shields.io/badge/Latest-v0.3.0-blue) ![Status](https://img.shields.io/badge/Status-Beta-yellow)
 
 ---
 
@@ -16,6 +16,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - [ ] Competitive mode / leaderboards
 - [ ] Multiplayer challenges (compare progress)
 - [ ] Cloud sync for progression
+
+---
+
+## [0.3.0] - 2026-06-22
+
+### ✨ Added
+- **⌨️ Interactive file navigation** — with the file tree visible and the input empty, arrow keys select an entry and Enter opens it (file → preview, directory → cd), with a highlighted selection and an `↑↓ navigate • Enter open` hint.
+- **📊 Top-5 process panel** ([src/ui/reactive.rs](../../src/ui/reactive.rs)) — the resource monitor now lists the 5 processes by CPU usage (pid, name, cpu%, memory).
+- **🏅 Rank progression** — the stats panel shows the next rank and the level that unlocks it; `game::tier::Tier` is the single source for rank, theme, prompt symbol and border.
+- **🛟 RAII terminal guard** ([src/tui.rs](../../src/tui.rs)) — `TerminalGuard` owns the terminal and restores it on every exit path (normal return, `?`, panic).
+
+### 🔒 Security
+- **Safe-mode bypass closed** ([src/core/parser.rs](../../src/core/parser.rs)) — safe mode now validates **every** command segment (`;`, `&&`, `||`, `|`) and blocks command substitution (`$(...)`/backticks). Previously only the first token was checked, so `echo ok; rm -rf /tmp/x` slipped through.
+- **SSH shell-quoting** ([src/core/ssh.rs](../../src/core/ssh.rs)) — `remote_cwd` (from the server) and remote paths are POSIX-quoted, preventing shell injection.
+- **Danger-zone confirmation** — destructive commands require an explicit `yes`/`sim` instead of running on Enter.
+- **`xp` cheat gated** — the XP cheat compiles only in debug builds.
+
+### ♻️ Changed / Refactored
+- **Single sources of truth**: `core/commands` (command catalog → classification, autocomplete, coloring), `core/filetype` (extension → language/icon/color) and `game/tier` (rank tiers). One persistent `SystemMonitor`. New helpers `git()`, `panel_block`, `try_t`, `parse_cd_arg`, `git_segment_spans`, `local_prompt_prefix`.
+- **Full internationalization** — every user-visible string moved to `locales/{pt-BR,en-US}` (~70 new keys); a test verifies all keys resolve in both locales.
+- `command_to_panel_mode` moved out of `core` (removes the core→app dependency); `execute_command` slimmed (special-command and SSH-session handlers extracted).
+- **Removed all dead code** — zero `#[allow(dead_code)]` remaining.
+
+### 🐛 Fixed
+- `.ts` files were highlighted as JavaScript (the TypeScript branch was unreachable).
+- Division by zero in memory %, gauge panics (now clamped to 100), `benchmark parar` not cancelling, wrong distro-guide titles, and "did you mean?" suggestions searching the wrong directory after `cd`.
+
+### 🧪 Tests
+- 42 tests total — `GameState`, `Quest::update_progress`, `AchievementChecker`, i18n key resolution, and a safe-mode security regression.
 
 ---
 
