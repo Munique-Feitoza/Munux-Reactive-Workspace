@@ -3,7 +3,7 @@
 
 [package]
 name = "munux-reactive-workspace"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 authors = ["Munique Alves Pacheco Feitoza"]
 license = "GPL-3.0"

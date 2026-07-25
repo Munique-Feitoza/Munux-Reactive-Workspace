@@ -4,7 +4,7 @@ All notable changes to Munux Reactive Workspace will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-![Version](https://img.shields.io/badge/Latest-v0.3.0-blue) ![Status](https://img.shields.io/badge/Status-Beta-yellow)
+![Version](https://img.shields.io/badge/Latest-v0.3.1-blue) ![Status](https://img.shields.io/badge/Status-Beta-yellow)
 
 ---
 
@@ -16,6 +16,70 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - [ ] Competitive mode / leaderboards
 - [ ] Multiplayer challenges (compare progress)
 - [ ] Cloud sync for progression
+
+---
+
+## [0.3.1] - 2026-07-25
+
+A **cleanup** release: performance, complexity and duplication, with no new features. Deliberately shipped before the feature roadmap.
+
+### 🔒 Security
+- **SSH host key verification** ([src/core/ssh.rs](../../src/core/ssh.rs)) — connections now check the server key against `~/.ssh/known_hosts` **before** offering any credential. Same policy as OpenSSH: known key proceeds, **changed key aborts** (possible man-in-the-middle), new key is recorded (TOFU). Previously the handshake was accepted blindly.
+- Verification failures are a **typed** error (`SshError`), so the most critical message in the SSH flow reaches the user translated.
+
+### 🐛 Fixed
+- **`add_xp` gained at most one level per call** ([src/game/state.rs](../../src/game/state.rs)) — `add_xp(10_000)` at level 1 left the state at `level=2, xp=9900, threshold=120`, so the player unlocked one level per command until the surplus drained. Large grants are real: the `rm -rf /` easter egg awards 666 XP.
+- **Success inferred from a translatable string** ([src/app.rs](../../src/app.rs)) — achievements and streaks depended on `last_output.starts_with("✗")`. They now use `output.success`.
+- **Unbounded scroll** ([src/main.rs](../../src/main.rs)) — holding PageDown led to an empty panel with no way back. `App::scroll_by` clamps to the content and unifies the four scroll sites.
+- **`lsof` and `last` treated as listings** — the check used `starts_with`; it is now an exact token match sourced from `core::commands`.
+- **`partial_cmp().unwrap()` in the monitor** — replaced with `total_cmp`; it was a possible panic inside the render path.
+- **Untranslated `$item` in quests** — the Portuguese text read "file '...' criado(a)". Separate keys for file and folder now.
+- **Unbounded command output** — `cat` on a large file loaded everything into RAM and re-parsed the ANSI every frame. Capped at 2,000 lines with a notice.
+
+### ⚡ Performance
+- **Autocomplete O(k²) → O(k)** ([src/core/completion.rs](../../src/core/completion.rs)) — dedup scanned the accumulator linearly. With 7,683 executables on `$PATH`, an empty-prefix Tab cost **29.4 ms** (release); it now costs **8.5 ms**, the remainder being plain `readdir`.
+- **No more `read_dir` per frame** ([src/app.rs](../../src/app.rs)) — the file tree was re-read (one `stat` per entry plus a sort) on every keystroke. It is now cached and refreshed on directory change, after each command, and on the 1 s tick while the tree is visible.
+- **No more re-reading files per keystroke** — typing `cat file.txt` re-read the whole file (up to 1 MB) per character. Preview is memoized by path.
+- **Command catalog O(n) → O(1)** ([src/core/commands.rs](../../src/core/commands.rs)) — `classify_command` runs 2× per keystroke and once per frame and scanned 133 entries; it now queries a `HashMap` index.
+- **Duplicate `classify_command` per keystroke** — `analyze_input` classified and `command_to_panel_mode` classified again. The type is now computed once and passed down.
+- **System monitor** ([src/core/monitor.rs](../../src/core/monitor.rs)) — `refresh_all` + `refresh_cpu` + `refresh_processes` scanned CPU and processes twice per tick; it is a single refresh now. The top-5 uses O(n) partial selection instead of a full O(n log n) sort.
+- **`has_achievement` O(n) → O(1)** — up to 15 lookups per command scanned the whole vector; derived `HashSet` index, invalidated on each unlock.
+- **`find_matching_files` without a `stat` per entry** — uses the `readdir` `d_type`.
+
+### ♻️ Changed / Refactored
+- **`execute_command` is no longer a God Object** — 382 lines and cyclomatic complexity **57** became a three-stage orchestrator (prepare / dispatch / settle) with dedicated handlers. None exceeds CC 11.
+- **Quest types became data** ([src/game/quests.rs](../../src/game/quests.rs)) — the 17 `QuestObjective` variants required editing three `match` blocks (CC 46 + 31 + 18 = **95**) to add a quest. An objective is now a `Trigger` plus text keys, and a new quest is one entry in `generate_quests_for_level`. `update_progress` dropped to CC 9.
+- **Level bands: 6 tables → 1** — `Stage` ([src/ui/theme.rs](../../src/ui/theme.rs)) is the single source of visual cut points and refines `Tier`. The divergent `level_commands` table cut at 10 while every other cut at 9: a level-10 player was already an Apprentice with the Hacker theme but still got beginner hints. A test keeps stage and tier from drifting apart again.
+- **Single PRNG** ([src/game/rng.rs](../../src/game/rng.rs)) — `clock_index` (seconds) and `pseudo_index` (nanos) were the same concept implemented twice.
+- **Danger-zone warning became a table** — an 8-deep `else if` chain inside `command_to_panel_mode`.
+- **Parallel command lists removed** — `mkdir|touch|rm |mv |cp `, `["ls","ll","la"]` and the dangerous-command words now derive from `core::commands`.
+- **`core` no longer writes user-facing text** — `read_file_preview` reports the fact (`truncated_at`) and the UI chooses the words.
+
+### 🌍 Internationalization
+- Strings still hardcoded in Portuguese moved to the locales: file preview, command help, popup footer, danger-zone tip, large-file notice, host key messages, and **the entire interactive tutorial**.
+- New structural test: both locales must declare **exactly** the same key set — a key added to only one language would silently fall back.
+
+- **Distro guides and easter eggs translated** — the five `help <distro>` guides (~180 lines) and the 14 easter eggs moved out of hardcoded Portuguese `r#"..."#` blocks into `locales/<lang>/{guides,eggs}/*.txt`, loaded through `I18n::content`. Long formatted blocks do not fit Fluent (a multiline value needs continuation indentation and would break on the `{}` in code samples), so they became text files embedded in the binary by the same `include_dir!`. Quotes from English-language works (Matrix, Portal, Hackers) are deliberately identical in both locales — and a test enforces it.
+- **Typed SSH errors** — `SshError` covers connection, handshake, authentication, host key and remote `cd`. The `core` reports the fact and the `app` layer picks the words; these messages previously reached English-speaking users in Portuguese.
+- **`cowsay` bubble aligned with accents** — the border was sized in bytes (`len()`), so `cowsay coração` came out crooked. It now counts characters.
+
+### 📚 Documentation
+- **PT and EN changelogs aligned.** The English one had no **0.1.1** entry at all and listed "Internationalization" under 0.2.0 — but all six i18n commits are dated 2026-02-16, the 0.1.1 date. Fixed in both languages, and 0.1.1 now records what actually happened there (the Project Fluent rollout). The 0.0.1 entry (internal alpha), which existed only in English, was mirrored into Portuguese.
+- Version badges in `docs/{en,pt-br}/README.md` updated (they were stuck at 0.2.0).
+- README: the feature roadmap was renumbered to **0.4.0** — 0.3.1 is a cleanup release.
+
+### 💾 Save format
+- **v1 → v2.** The `QuestObjective` format changed. v1 saves migrate automatically: XP, level, achievements, streaks, history and aliases are **fully preserved**; only in-progress quests are discarded and regenerated for the current level. Covered by an on-disk test.
+
+### 📊 Numbers
+| Metric | Before | After |
+|---|---|---|
+| Average cyclomatic complexity | 4.2 | **3.5** |
+| Functions with CC > 20 | 7 | **3** |
+| Worst function (`execute_command`) | CC 57 | **< 8** |
+| Quests (`update_progress`) | CC 46 | **CC 9** |
+| Empty-prefix Tab (release) | 29.4 ms | **8.5 ms** |
+| Tests | 42 | **69** |
 
 ---
 
@@ -64,7 +128,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Cyan-bordered terminal panel + remote prompt `user@host cwd$` when a session is active.
   - Auto-injected `--color=always` for `ls`/`grep` to preserve ANSI colors via `ansi-to-tui`.
   - `exit`/`logout` drops the session and returns to the local shell.
-- **🌍 Internationalization** — full i18n via Project Fluent (EN / PT-BR), auto-detected from the system locale.
 - **📚 Docs refresh** — architecture and API docs include colored UML diagrams (class, state, sequence, flow) in both EN and PT-BR.
 
 ### ♻️ Changed / Refactored
@@ -75,6 +138,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### 🐛 Fixed
 - Locale key typo `achievement_easter_egg_nuke-desc` (was using `_` instead of `-`), which left the achievement description missing.
+
+---
+
+## [0.1.1] - 2026-02-16
+
+### ✨ Added
+
+- 🌍 **Internationalization (Project Fluent)** ([src/i18n.rs](../../src/i18n.rs)) — every user-facing string moved to `locales/{pt-BR,en-US}/main.ftl`, with the language auto-detected from the system locale and English as the fallback. Reactive dashboard, themes, stats, quests, achievements, terminal, HUD and the event loop were all localized.
+- 🌍 **Fully bilingual documentation**: the whole docs tree is available in English (EN) and Portuguese (PT-BR).
+- 🐚 **Smart Git integration**: new prompt with file counters (staged, modified, untracked) and sync status (ahead/behind).
 
 ---
 

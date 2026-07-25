@@ -2,7 +2,7 @@
 
 Bem-vindo à documentação do Munux Reactive Workspace! Este índice ajuda você a encontrar exatamente o que precisa em seu idioma.
 
-![Versão](https://img.shields.io/badge/versão-0.2.0-blue) ![Status](https://img.shields.io/badge/docs-100%25-brightgreen)
+![Versão](https://img.shields.io/badge/versão-0.3.1-blue) ![Status](https://img.shields.io/badge/docs-100%25-brightgreen)
 
 ---
 

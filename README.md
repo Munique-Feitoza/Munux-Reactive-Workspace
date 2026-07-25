@@ -472,7 +472,21 @@ cargo build --release
 - [x] Interactive tutorial mode for beginners - **Implemented v0.2.0**
 - [x] Benchmark mode (test typing speed) - **Implemented v0.2.0**
 
-### 🔮 Version 0.3.0 - Future
+### ✅ Version 0.3.1 - COMPLETE (cleanup)
+
+No new features — a deliberate pass over performance, cyclomatic complexity and
+duplication before the next feature cycle. See the
+[changelog](docs/en/CHANGELOG.md) for the full list and measurements.
+
+- [x] SSH host key verification against `known_hosts` (was accepted blindly)
+- [x] Multi-level `add_xp`, unbounded scroll, `total_cmp` and other verified bug fixes
+- [x] Autocomplete O(k²) → O(k) (29.4 ms → 8.5 ms), no more `read_dir`/file re-read per keystroke
+- [x] `execute_command` CC 57 → < 8; quest objectives became data (CC 95 → 9)
+- [x] Level bands unified (6 divergent tables → 1); command catalog is O(1)
+- [x] Remaining hardcoded Portuguese strings localized + locale parity test
+- [x] Save format v2 with automatic v1 migration (progress preserved)
+
+### 🔮 Version 0.4.0 - Future
 
 - [ ] Customizable themes (create your own)
 - [ ] Plugins and extensions
