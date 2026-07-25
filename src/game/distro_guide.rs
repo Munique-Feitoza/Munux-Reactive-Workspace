@@ -1,234 +1,139 @@
 // Author: Munique Alves Pacheco Feitoza
 // License: GPLv3
 
+//! Guia de comandos por distribuição Linux.
+//!
+//! O texto dos guias **não** vive aqui: cada idioma tem o seu em
+//! `locales/<lang>/guides/<distro>.txt`, carregado por
+//! [`crate::i18n::I18n::content`]. Antes os cinco guias estavam embutidos neste
+//! arquivo em português fixo, o que deixava metade do `help` monolíngue num app
+//! que se anuncia bilíngue.
+//!
+//! Acrescentar uma distro é: uma entrada em [`GUIDES`] + dois arquivos de texto
+//! + uma chave de título nos `.ftl`.
+
+use crate::i18n::I18n;
+
+/// Guia de uma distro: os aliases aceitos no `help <distro>`, o nome do arquivo
+/// de conteúdo e a chave Fluent do título.
+struct Guide {
+    /// Nomes que levam a este guia (comparados em minúsculas).
+    aliases: &'static [&'static str],
+    /// Nome do arquivo em `locales/<lang>/guides/`, sem a extensão.
+    file: &'static str,
+    /// Chave Fluent do título exibido no painel.
+    title_key: &'static str,
+}
+
+/// Catálogo de guias. O último não tem aliases e serve de fallback universal.
+const GUIDES: &[Guide] = &[
+    Guide { aliases: &["manjaro", "arch"], file: "arch", title_key: "guide-arch-title" },
+    Guide {
+        aliases: &["ubuntu", "debian", "mint"],
+        file: "debian",
+        title_key: "guide-debian-title",
+    },
+    Guide {
+        aliases: &["fedora", "rhel", "centos"],
+        file: "fedora",
+        title_key: "guide-fedora-title",
+    },
+    Guide { aliases: &["opensuse"], file: "opensuse", title_key: "guide-opensuse-title" },
+    Guide { aliases: &[], file: "general", title_key: "guide-general-title" },
+];
+
 /// Guia de comandos por distribuição Linux
 pub struct DistroGuide;
 
 impl DistroGuide {
-    /// Retorna `(conteúdo, título)` do guia da distro. Fonte única: antes o
-    /// conteúdo (aqui) e o título (em `app.rs`) eram mapeados separadamente e
-    /// divergiam — `help manjaro/mint/rhel/centos` mostrava o guia certo com
-    /// título errado.
-    pub fn get(distro: &str) -> (String, &'static str) {
-        match distro.to_lowercase().as_str() {
-            "manjaro" | "arch" => (Self::arch_guide(), "Guia Manjaro/Arch Linux"),
-            "ubuntu" | "debian" | "mint" => (Self::debian_guide(), "Guia Ubuntu/Debian/Mint"),
-            "fedora" | "rhel" | "centos" => (Self::fedora_guide(), "Guia Fedora/RHEL/CentOS"),
-            "opensuse" => (Self::opensuse_guide(), "Guia openSUSE"),
-            _ => (Self::general_guide(), "Guia Linux Universal"),
+    /// Retorna `(conteúdo, título)` do guia da distro, no idioma ativo.
+    ///
+    /// Fonte única: antes o conteúdo (aqui) e o título (em `app.rs`) eram
+    /// mapeados separadamente e divergiam — `help manjaro/mint/rhel/centos`
+    /// mostrava o guia certo com o título errado.
+    pub fn get(distro: &str, i18n: &I18n) -> (String, String) {
+        let needle = distro.to_lowercase();
+
+        let guide = GUIDES
+            .iter()
+            .find(|g| g.aliases.contains(&needle.as_str()))
+            .unwrap_or_else(|| GUIDES.last().expect("GUIDES nunca é vazio"));
+
+        let content = i18n
+            .content(&format!("guides/{}.txt", guide.file))
+            .unwrap_or_default()
+            .to_string();
+
+        (content, i18n.tc(guide.title_key))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::i18n::Language;
+
+    /// Todo guia precisa existir nos dois idiomas, com título traduzido. Sem
+    /// esta guarda, uma distro nova poderia sair com o painel em branco.
+    #[test]
+    fn every_guide_has_content_and_title_in_both_locales() {
+        for lang in [Language::PtBr, Language::EnUs] {
+            let i18n = I18n::new(lang);
+            for guide in GUIDES {
+                let file = format!("guides/{}.txt", guide.file);
+                let content = i18n
+                    .content(&file)
+                    .unwrap_or_else(|| panic!("{} ausente no locale {:?}", file, lang));
+                assert!(
+                    content.len() > 200,
+                    "{} parece truncado em {:?} ({} bytes)",
+                    file,
+                    lang,
+                    content.len()
+                );
+
+                let title = i18n.tc(guide.title_key);
+                assert!(
+                    !title.starts_with("[MISSING"),
+                    "título '{}' ausente em {:?}",
+                    guide.title_key,
+                    lang
+                );
+            }
         }
     }
-    
-    fn arch_guide() -> String {
-        r#"
-╔═══════════════════════════════════════════════════════════╗
-║          GUIA MANJARO/ARCH LINUX - PACMAN                 ║
-╚═══════════════════════════════════════════════════════════╝
 
-📦 GERENCIAMENTO DE PACOTES (PACMAN)
-────────────────────────────────────────────────────────────
-  sudo pacman -S <pacote>       # Instala pacote
-  sudo pacman -R <pacote>       # Remove pacote
-  sudo pacman -Rs <pacote>      # Remove + dependências
-  sudo pacman -Syu              # Atualiza sistema completo
-  sudo pacman -Ss <nome>        # Busca pacote
-  sudo pacman -Qi <pacote>      # Info do pacote instalado
-  sudo pacman -Sc               # Limpa cache
+    /// Cada alias precisa levar ao guia certo, e um nome desconhecido tem que
+    /// cair no guia universal.
+    #[test]
+    fn aliases_route_to_the_right_guide() {
+        let i18n = I18n::new(Language::PtBr);
 
-📦 AUR HELPER (YAY/PARU)
-────────────────────────────────────────────────────────────
-  yay <pacote>                  # Busca e instala (AUR)
-  yay -S <pacote>               # Instala do AUR
-  yay -Syu                      # Atualiza tudo (oficial + AUR)
-  yay -Ps                       # Estatísticas do sistema
-  paru <pacote>                 # Alternativa ao yay
+        for (alias, marker) in [
+            ("manjaro", "pacman"),
+            ("ARCH", "pacman"), // maiúsculas não importam
+            ("mint", "apt"),
+            ("centos", "dnf"),
+            ("opensuse", "zypper"),
+        ] {
+            let (content, _) = DistroGuide::get(alias, &i18n);
+            assert!(content.contains(marker), "'{}' não levou ao guia com '{}'", alias, marker);
+        }
 
-🔧 PAMAC (GUI/CLI)
-────────────────────────────────────────────────────────────
-  pamac install <pacote>        # Instala
-  pamac remove <pacote>         # Remove
-  pamac update                  # Atualiza
-  pamac search <nome>           # Busca
-
-💡 DICAS MANJARO
-────────────────────────────────────────────────────────────
-  • Sempre rode 'sudo pacman -Syu' antes de instalar algo
-  • AUR não é oficial - use com cuidado
-  • Base-devel é necessário para compilar do AUR
-  • Kernel Manager: sudo mhwd-kernel -li
-"#.to_string()
+        // Distro desconhecida cai no universal.
+        let (content, title) = DistroGuide::get("plan9", &i18n);
+        assert!(content.contains("ls"), "o fallback deveria ser o guia universal");
+        assert_eq!(title, i18n.tc("guide-general-title"));
     }
-    
-    fn debian_guide() -> String {
-        r#"
-╔═══════════════════════════════════════════════════════════╗
-║        GUIA UBUNTU/DEBIAN - APT                           ║
-╚═══════════════════════════════════════════════════════════╝
 
-📦 GERENCIAMENTO DE PACOTES (APT)
-────────────────────────────────────────────────────────────
-  sudo apt update               # Atualiza lista de pacotes
-  sudo apt upgrade              # Atualiza pacotes instalados
-  sudo apt full-upgrade         # Atualiza + remove obsoletos
-  sudo apt install <pacote>     # Instala pacote
-  sudo apt remove <pacote>      # Remove pacote
-  sudo apt purge <pacote>       # Remove + configs
-  sudo apt autoremove           # Remove dependências órfãs
-  sudo apt search <nome>        # Busca pacote
-  sudo apt show <pacote>        # Mostra info do pacote
-  sudo apt clean                # Limpa cache
-
-📦 REPOSITÓRIOS (PPA)
-────────────────────────────────────────────────────────────
-  sudo add-apt-repository ppa:user/ppa  # Adiciona PPA
-  sudo add-apt-repository --remove ppa:user/ppa  # Remove PPA
-
-📦 DPKG (Pacotes .deb)
-────────────────────────────────────────────────────────────
-  sudo dpkg -i pacote.deb       # Instala .deb
-  sudo dpkg -r <pacote>         # Remove pacote
-  dpkg -l                       # Lista instalados
-  sudo apt --fix-broken install # Corrige dependências
-
-📦 SNAP
-────────────────────────────────────────────────────────────
-  sudo snap install <pacote>    # Instala snap
-  sudo snap remove <pacote>     # Remove snap
-  snap find <nome>              # Busca snap
-  snap refresh                  # Atualiza todos
-
-💡 DICAS DEBIAN/UBUNTU
-────────────────────────────────────────────────────────────
-  • Sempre 'sudo apt update' antes de 'apt install'
-  • use 'apt' em vez de 'apt-get' (mais moderno)
-  • PPAs podem causar conflitos - cuidado!
-  • LTS = Long Term Support (5 anos de atualizações)
-"#.to_string()
-    }
-    
-    fn fedora_guide() -> String {
-        r#"
-╔═══════════════════════════════════════════════════════════╗
-║         GUIA FEDORA/RHEL - DNF/YUM                        ║
-╚═══════════════════════════════════════════════════════════╝
-
-📦 GERENCIAMENTO DE PACOTES (DNF)
-────────────────────────────────────────────────────────────
-  sudo dnf install <pacote>     # Instala pacote
-  sudo dnf remove <pacote>      # Remove pacote
-  sudo dnf upgrade              # Atualiza tudo
-  sudo dnf search <nome>        # Busca pacote
-  sudo dnf info <pacote>        # Info do pacote
-  sudo dnf autoremove           # Remove órfãos
-  sudo dnf clean all            # Limpa cache
-
-📦 REPOSITÓRIOS
-────────────────────────────────────────────────────────────
-  sudo dnf config-manager --add-repo <url>  # Adiciona repo
-  sudo dnf repolist             # Lista repos
-
-📦 RPM (Pacotes .rpm)
-────────────────────────────────────────────────────────────
-  sudo rpm -i pacote.rpm        # Instala .rpm
-  sudo rpm -e <pacote>          # Remove
-  rpm -qa                       # Lista instalados
-  rpm -qi <pacote>              # Info do pacote
-
-💡 DICAS FEDORA
-────────────────────────────────────────────────────────────
-  • DNF é sucessor do YUM (mais rápido)
-  • RPM Fusion para codecs/drivers proprietários
-  • Versão nova a cada 6 meses
-  • COPR = PPAs do Fedora
-"#.to_string()
-    }
-    
-    fn opensuse_guide() -> String {
-        r#"
-╔═══════════════════════════════════════════════════════════╗
-║            GUIA OPENSUSE - ZYPPER                         ║
-╚═══════════════════════════════════════════════════════════╝
-
-📦 GERENCIAMENTO DE PACOTES (ZYPPER)
-────────────────────────────────────────────────────────────
-  sudo zypper install <pacote>  # Instala (in/i)
-  sudo zypper remove <pacote>   # Remove (rm)
-  sudo zypper update            # Atualiza (up)
-  sudo zypper search <nome>     # Busca (se)
-  sudo zypper info <pacote>     # Info (if)
-  sudo zypper refresh           # Atualiza repos (ref)
-  sudo zypper dist-upgrade      # Upgrade completo (dup)
-
-📦 REPOSITÓRIOS
-────────────────────────────────────────────────────────────
-  sudo zypper addrepo <url> <nome>  # Adiciona repo
-  sudo zypper repos             # Lista repos
-
-💡 DICAS OPENSUSE
-────────────────────────────────────────────────────────────
-  • YaST = ferramenta de configuração central
-  • Tumbleweed = rolling release
-  • Leap = release estável
-  • Btrfs + snapshots nativos
-"#.to_string()
-    }
-    
-    fn general_guide() -> String {
-        r#"
-╔═══════════════════════════════════════════════════════════╗
-║        COMANDOS LINUX UNIVERSAIS                          ║
-╚═══════════════════════════════════════════════════════════╝
-
-📁 NAVEGAÇÃO E ARQUIVOS
-────────────────────────────────────────────────────────────
-  ls                 # Lista arquivos
-  ls -la             # Lista com detalhes + ocultos
-  cd <pasta>         # Muda diretório
-  pwd                # Mostra local atual
-  mkdir <nome>       # Cria pasta
-  touch <arquivo>    # Cria arquivo
-  rm <arquivo>       # Remove arquivo
-  rm -r <pasta>      # Remove pasta
-  cp origem destino  # Copia
-  mv origem destino  # Move/renomeia
-
-📝 VISUALIZAÇÃO DE ARQUIVOS
-────────────────────────────────────────────────────────────
-  cat <arquivo>      # Mostra conteúdo
-  less <arquivo>     # Visualiza (navegável)
-  head <arquivo>     # Primeiras linhas
-  tail <arquivo>     # Últimas linhas
-  nano <arquivo>     # Editor simples
-  vim <arquivo>      # Editor avançado
-
-🌐 REDE
-────────────────────────────────────────────────────────────
-  ping <host>        # Testa conexão
-  curl <url>         # Baixa/acessa URL
-  wget <url>         # Baixa arquivo
-  ssh user@host      # Acesso remoto
-  ip addr            # Mostra IPs
-  netstat -tunlp     # Portas abertas
-
-⚙️ SISTEMA
-────────────────────────────────────────────────────────────
-  top / htop         # Monitor de processos
-  ps aux             # Lista processos
-  kill <PID>         # Mata processo
-  free -h            # Memória
-  df -h              # Espaço em disco
-  uname -a           # Info do sistema
-  systemctl status <serviço>  # Status de serviço
-
-📦 COMPRESSÃO
-────────────────────────────────────────────────────────────
-  tar -czf arquivo.tar.gz pasta/  # Compacta
-  tar -xzf arquivo.tar.gz         # Extrai
-  zip -r arquivo.zip pasta/       # ZIP
-  unzip arquivo.zip               # Descompacta
-
-💡 Use 'help <distro>' para guias específicos:
-   help manjaro | help ubuntu | help fedora | help opensuse
-"#.to_string()
+    /// O conteúdo tem que mudar de idioma junto com o locale — senão a tradução
+    /// existe no disco mas ninguém a lê.
+    #[test]
+    fn guides_actually_differ_between_locales() {
+        let pt = DistroGuide::get("arch", &I18n::new(Language::PtBr)).0;
+        let en = DistroGuide::get("arch", &I18n::new(Language::EnUs)).0;
+        assert_ne!(pt, en, "o guia em inglês não pode ser o texto em português");
+        assert!(pt.contains("Instala pacote"), "guia pt-BR mudou de texto");
+        assert!(en.contains("Install a package"), "guia en-US mudou de texto");
     }
 }

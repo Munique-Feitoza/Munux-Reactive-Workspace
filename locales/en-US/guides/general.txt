@@ -1,0 +1,54 @@
+╔═══════════════════════════════════════════════════════════╗
+║        UNIVERSAL LINUX COMMANDS                           ║
+╚═══════════════════════════════════════════════════════════╝
+
+📁 NAVIGATION AND FILES
+────────────────────────────────────────────────────────────
+  ls                 # List files
+  ls -la             # List with details + hidden files
+  cd <folder>        # Change directory
+  pwd                # Show the current location
+  mkdir <name>       # Create a folder
+  touch <file>       # Create a file
+  rm <file>          # Remove a file
+  rm -r <folder>     # Remove a folder
+  cp source dest     # Copy
+  mv source dest     # Move/rename
+
+📝 VIEWING FILES
+────────────────────────────────────────────────────────────
+  cat <file>         # Show the content
+  less <file>        # View (scrollable)
+  head <file>        # First lines
+  tail <file>        # Last lines
+  nano <file>        # Simple editor
+  vim <file>         # Advanced editor
+
+🌐 NETWORK
+────────────────────────────────────────────────────────────
+  ping <host>        # Test connectivity
+  curl <url>         # Fetch/access a URL
+  wget <url>         # Download a file
+  ssh user@host      # Remote access
+  ip addr            # Show IP addresses
+  netstat -tunlp     # Open ports
+
+⚙️ SYSTEM
+────────────────────────────────────────────────────────────
+  top / htop         # Process monitor
+  ps aux             # List processes
+  kill <PID>         # Kill a process
+  free -h            # Memory
+  df -h              # Disk space
+  uname -a           # System info
+  systemctl status <service>  # Service status
+
+📦 COMPRESSION
+────────────────────────────────────────────────────────────
+  tar -czf archive.tar.gz folder/  # Compress
+  tar -xzf archive.tar.gz          # Extract
+  zip -r archive.zip folder/       # ZIP
+  unzip archive.zip                # Unzip
+
+💡 Use 'help <distro>' for specific guides:
+   help manjaro | help ubuntu | help fedora | help opensuse

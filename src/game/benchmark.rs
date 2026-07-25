@@ -30,7 +30,7 @@ pub struct BenchmarkState {
 impl BenchmarkState {
     /// Inicia um novo teste com uma frase pseudo-aleatória.
     pub fn start() -> Self {
-        let idx = pseudo_index(PHRASES.len());
+        let idx = crate::game::rng::index(PHRASES.len());
         BenchmarkState { prompt: PHRASES[idx].to_string(), started_at: Instant::now() }
     }
 }
@@ -70,16 +70,6 @@ pub fn score(prompt: &str, typed: &str, seconds: f64) -> BenchmarkResult {
     let xp = (((wpm as f64) * (accuracy as f64) / 100.0).round() as u32).clamp(5, 150);
 
     BenchmarkResult { wpm, accuracy, seconds, xp }
-}
-
-/// Índice pseudo-aleatório em `[0, len)` derivado do relógio (sem dependências).
-fn pseudo_index(len: usize) -> usize {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.subsec_nanos() as usize)
-        .unwrap_or(0);
-    if len == 0 { 0 } else { nanos % len }
 }
 
 #[cfg(test)]

@@ -1,0 +1,5 @@
+🤨 O que? Faça você mesmo.
+
+(Dica: tente com 'sudo'.)
+
+— xkcd #149

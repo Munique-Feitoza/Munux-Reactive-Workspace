@@ -80,6 +80,34 @@ mod tests {
         assert_eq!(Tier::from_level(45), Tier::Legend);
     }
 
+    /// O estágio visual (6 degraus) precisa **refinar** a patente (5 degraus):
+    /// todo nível de um mesmo estágio tem que cair na mesma patente. É esta
+    /// guarda que impede as duas tabelas de voltarem a divergir — foi assim que
+    /// nasceu o bug em que quem estava no nível 10 já era Aprendiz mas ainda
+    /// recebia as dicas de iniciante.
+    #[test]
+    fn stage_refines_tier() {
+        use crate::ui::theme::Stage;
+        use std::collections::HashMap;
+
+        let mut tier_of_stage: HashMap<Stage, Tier> = HashMap::new();
+        for level in 0..=120u32 {
+            let stage = Stage::from_level(level);
+            let tier = Tier::from_level(level);
+            match tier_of_stage.get(&stage) {
+                Some(expected) => assert_eq!(
+                    *expected, tier,
+                    "nível {}: estágio {:?} cai em duas patentes diferentes",
+                    level, stage
+                ),
+                None => {
+                    tier_of_stage.insert(stage, tier);
+                }
+            }
+        }
+        assert_eq!(tier_of_stage.len(), 6, "todos os estágios devem ser alcançáveis");
+    }
+
     #[test]
     fn next_tier_starts_where_current_ends() {
         // O nível em que a próxima patente começa bate com o min_level dela.

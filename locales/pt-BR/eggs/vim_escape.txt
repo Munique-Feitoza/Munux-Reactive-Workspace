@@ -1,0 +1,5 @@
+Você não está no Vim. 😏
+
+Mas que reflexo, hein? Anos de :wq na memória muscular.
+
+(Para sair do Munux de verdade: Ctrl+C)

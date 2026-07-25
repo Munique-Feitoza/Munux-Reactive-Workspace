@@ -5,25 +5,52 @@ use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Tamanho máximo lido inteiro para preview (1 MB).
+const MAX_PREVIEW_SIZE: u64 = 1024 * 1024;
+
+/// Quanto se lê do começo de um arquivo grande demais.
+const PREVIEW_HEAD_BYTES: usize = 1024;
+
+/// Conteúdo lido para preview, com o aviso de corte separado do texto.
+///
+/// A mensagem "arquivo grande demais" era concatenada aqui, em português fixo,
+/// dentro de um módulo `core` que não deve conhecer idioma. Agora o `core`
+/// informa **o fato** e a UI decide como dizê-lo.
+#[derive(Debug, Clone, Default)]
+pub struct FilePreview {
+    /// O texto lido (completo ou só o começo).
+    pub content: String,
+    /// Tamanho total em bytes quando o arquivo foi cortado; `None` se inteiro.
+    pub truncated_at: Option<u64>,
+}
+
 /// Gerenciador de sistema de arquivos
 pub struct FileSystemManager;
 
 impl FileSystemManager {
-    /// Lê o conteúdo de um arquivo (limitado a 1MB)
-    pub fn read_file_preview(path: &Path) -> Result<String> {
-        const MAX_SIZE: u64 = 1024 * 1024; // 1MB
-        
+    /// Lê o conteúdo de um arquivo para preview.
+    ///
+    /// Acima de [`MAX_PREVIEW_SIZE`] devolve só o começo, sinalizado em
+    /// [`FilePreview::truncated_at`] — a mensagem para o usuário é montada e
+    /// traduzida na camada de UI, que é quem conhece o `i18n`.
+    pub fn read_file_preview(path: &Path) -> Result<FilePreview> {
         let metadata = fs::metadata(path)?;
-        
-        if metadata.len() > MAX_SIZE {
-            return Ok(format!(
-                "[Arquivo muito grande: {} bytes]\nApenas os primeiros bytes serão mostrados.\n\n{}",
-                metadata.len(),
-                String::from_utf8_lossy(&fs::read(path)?[..1024])
-            ));
+
+        if metadata.len() > MAX_PREVIEW_SIZE {
+            // Lê só o cabeçalho em vez do arquivo inteiro: antes o `fs::read`
+            // carregava o arquivo completo na memória só para fatiar 1 KB dele.
+            let mut head = vec![0u8; PREVIEW_HEAD_BYTES];
+            let mut file = fs::File::open(path)?;
+            let read = std::io::Read::read(&mut file, &mut head)?;
+            head.truncate(read);
+
+            return Ok(FilePreview {
+                content: String::from_utf8_lossy(&head).into_owned(),
+                truncated_at: Some(metadata.len()),
+            });
         }
-        
-        Ok(fs::read_to_string(path)?)
+
+        Ok(FilePreview { content: fs::read_to_string(path)?, truncated_at: None })
     }
     
     /// Lista arquivos e diretórios

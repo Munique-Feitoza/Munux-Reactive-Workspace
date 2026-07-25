@@ -1,0 +1,10 @@
+🥪 Okay.
+
+(You used sudo. You are root now. The sandwich is yours.)
+
+   _________________
+  /                 \
+ |  🥬 🍅 🧀 🥓 🍞  |
+  \_________________/
+
+— xkcd #149

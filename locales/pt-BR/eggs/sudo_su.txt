@@ -1,0 +1,11 @@
+╔═══════════════════════════════════════╗
+║                                       ║
+║   Com grandes poderes vêm grandes     ║
+║   responsabilidades.                  ║
+║                                       ║
+║   Você agora tem poder ROOT.          ║
+║   Use com sabedoria.                  ║
+║                                       ║
+║              - Uncle Ben              ║
+║                                       ║
+╚═══════════════════════════════════════╝

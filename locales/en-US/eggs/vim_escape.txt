@@ -1,0 +1,5 @@
+You are not in Vim. 😏
+
+But what reflexes! Years of :wq burned into muscle memory.
+
+(To actually leave Munux: Ctrl+C)

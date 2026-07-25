@@ -1,0 +1,54 @@
+╔═══════════════════════════════════════════════════════════╗
+║        COMANDOS LINUX UNIVERSAIS                          ║
+╚═══════════════════════════════════════════════════════════╝
+
+📁 NAVEGAÇÃO E ARQUIVOS
+────────────────────────────────────────────────────────────
+  ls                 # Lista arquivos
+  ls -la             # Lista com detalhes + ocultos
+  cd <pasta>         # Muda diretório
+  pwd                # Mostra local atual
+  mkdir <nome>       # Cria pasta
+  touch <arquivo>    # Cria arquivo
+  rm <arquivo>       # Remove arquivo
+  rm -r <pasta>      # Remove pasta
+  cp origem destino  # Copia
+  mv origem destino  # Move/renomeia
+
+📝 VISUALIZAÇÃO DE ARQUIVOS
+────────────────────────────────────────────────────────────
+  cat <arquivo>      # Mostra conteúdo
+  less <arquivo>     # Visualiza (navegável)
+  head <arquivo>     # Primeiras linhas
+  tail <arquivo>     # Últimas linhas
+  nano <arquivo>     # Editor simples
+  vim <arquivo>      # Editor avançado
+
+🌐 REDE
+────────────────────────────────────────────────────────────
+  ping <host>        # Testa conexão
+  curl <url>         # Baixa/acessa URL
+  wget <url>         # Baixa arquivo
+  ssh user@host      # Acesso remoto
+  ip addr            # Mostra IPs
+  netstat -tunlp     # Portas abertas
+
+⚙️ SISTEMA
+────────────────────────────────────────────────────────────
+  top / htop         # Monitor de processos
+  ps aux             # Lista processos
+  kill <PID>         # Mata processo
+  free -h            # Memória
+  df -h              # Espaço em disco
+  uname -a           # Info do sistema
+  systemctl status <serviço>  # Status de serviço
+
+📦 COMPRESSÃO
+────────────────────────────────────────────────────────────
+  tar -czf arquivo.tar.gz pasta/  # Compacta
+  tar -xzf arquivo.tar.gz         # Extrai
+  zip -r arquivo.zip pasta/       # ZIP
+  unzip arquivo.zip               # Descompacta
+
+💡 Use 'help <distro>' para guias específicos:
+   help manjaro | help ubuntu | help fedora | help opensuse

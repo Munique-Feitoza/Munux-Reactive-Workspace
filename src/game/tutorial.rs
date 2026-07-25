@@ -7,6 +7,12 @@
 //! quando o usuário executa algo que casa com o esperado. O estado vive em
 //! `App.tutorial` (índice do passo atual) e a orientação aparece no output do
 //! terminal, então não precisa de um painel reativo dedicado.
+//!
+//! Os textos vivem nos `.ftl`: o passo guarda só o **sufixo** da chave e resolve
+//! `tutorial-<sufixo>-title|instruction|hint`. Antes o roteiro inteiro estava em
+//! português fixo dentro deste arquivo, num app que se anuncia bilíngue.
+
+use crate::i18n::I18n;
 
 /// Regra de correspondência entre o comando do usuário e o passo do tutorial.
 pub enum Expect {
@@ -18,9 +24,8 @@ pub enum Expect {
 
 /// Um passo do tutorial.
 pub struct Step {
-    pub title: &'static str,
-    pub instruction: &'static str,
-    pub hint: &'static str,
+    /// Sufixo das chaves Fluent (`tutorial-{key}-title`, `-instruction`, `-hint`).
+    pub key: &'static str,
     pub expect: Expect,
 }
 
@@ -38,55 +43,48 @@ impl Step {
 
 /// Sequência de passos do tutorial.
 pub const STEPS: &[Step] = &[
-    Step {
-        title: "1/5 — Pedindo ajuda",
-        instruction: "Todo bom terminal tem um comando de ajuda. Digite: help",
-        hint: "É só escrever 'help' e apertar Enter.",
-        expect: Expect::Command("help"),
-    },
-    Step {
-        title: "2/5 — Onde estou?",
-        instruction: "O comando 'pwd' mostra o diretório atual. Experimente: pwd",
-        hint: "Digite 'pwd' (print working directory).",
-        expect: Expect::Command("pwd"),
-    },
-    Step {
-        title: "3/5 — Listando arquivos",
-        instruction: "Use 'ls' para listar os arquivos do diretório atual.",
-        hint: "Digite 'ls' e veja o painel da direita reagir.",
-        expect: Expect::Command("ls"),
-    },
-    Step {
-        title: "4/5 — Seu progresso",
-        instruction: "O Munux acompanha seu XP. Veja com: stats",
-        hint: "Digite 'stats' para abrir o painel de estatísticas.",
-        expect: Expect::Command("stats"),
-    },
-    Step {
-        title: "5/5 — Lendo um arquivo",
-        instruction: "Use 'cat <arquivo>' para ver o conteúdo de um arquivo (ex.: cat README.md).",
-        hint: "Comece o comando com 'cat ' seguido de um nome de arquivo.",
-        expect: Expect::CommandWithArg("cat"),
-    },
+    Step { key: "help", expect: Expect::Command("help") },
+    Step { key: "pwd", expect: Expect::Command("pwd") },
+    Step { key: "ls", expect: Expect::Command("ls") },
+    Step { key: "stats", expect: Expect::Command("stats") },
+    Step { key: "cat", expect: Expect::CommandWithArg("cat") },
 ];
 
 /// XP de bônus concedido ao concluir o tutorial inteiro.
 pub const COMPLETION_XP: u32 = 100;
 
-/// Texto exibido para o passo de índice `idx`.
-pub fn step_text(idx: usize) -> String {
-    match STEPS.get(idx) {
-        Some(step) => format!(
-            "🎓 TUTORIAL — {}\n\n{}\n\n💡 Dica: {}\n\n(digite 'tutorial sair' para encerrar)",
-            step.title, step.instruction, step.hint
-        ),
-        None => String::new(),
-    }
+/// Texto exibido para o passo de índice `idx`. Vazio se o índice não existe.
+///
+/// A montagem em várias linhas acontece aqui, em Rust: no Fluent, valores
+/// multilinha exigem indentação de continuação e quebram com linhas em branco
+/// no meio. Cada chave do `.ftl` é, portanto, uma linha só.
+pub fn step_text(idx: usize, i18n: &I18n) -> String {
+    use fluent::{FluentArgs, FluentValue};
+
+    let Some(step) = STEPS.get(idx) else {
+        return String::new();
+    };
+
+    // A numeração ("2/5") vem do tamanho real de STEPS, então acrescentar um
+    // passo não exige reescrever cinco títulos.
+    let mut header_args = FluentArgs::new();
+    header_args.set("step", FluentValue::from(idx as u32 + 1));
+    header_args.set("total", FluentValue::from(STEPS.len() as u32));
+    header_args.set("title", i18n.tc(&format!("tutorial-{}-title", step.key)));
+
+    format!(
+        "{}\n\n{}\n\n{}\n\n{}",
+        i18n.t("tutorial-header", Some(&header_args)),
+        i18n.tc(&format!("tutorial-{}-instruction", step.key)),
+        i18n.t1("tutorial-hint", "hint", i18n.tc(&format!("tutorial-{}-hint", step.key))),
+        i18n.tc("tutorial-exit-note"),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::i18n::Language;
 
     #[test]
     fn command_step_matches_first_word() {
@@ -104,11 +102,24 @@ mod tests {
         assert!(!step.matches("concat foo")); // não confunde com substring
     }
 
+    /// Todo passo precisa das três chaves nos dois locales — senão o roteiro
+    /// chegaria ao usuário como `[MISSING: ...]`.
     #[test]
-    fn step_text_for_each_step_is_nonempty() {
-        for i in 0..STEPS.len() {
-            assert!(!step_text(i).is_empty());
+    fn step_text_resolves_in_both_locales() {
+        for lang in [Language::PtBr, Language::EnUs] {
+            let i18n = I18n::new(lang);
+            for i in 0..STEPS.len() {
+                let text = step_text(i, &i18n);
+                assert!(!text.is_empty(), "passo {} vazio em {:?}", i, lang);
+                assert!(
+                    !text.contains("[MISSING"),
+                    "passo {} tem chave ausente em {:?}: {}",
+                    i,
+                    lang,
+                    text
+                );
+            }
+            assert!(step_text(STEPS.len(), &i18n).is_empty());
         }
-        assert!(step_text(STEPS.len()).is_empty());
     }
 }

@@ -1,0 +1,25 @@
+╔═══════════════════════════════════════════════════════════╗
+║            GUIA OPENSUSE - ZYPPER                         ║
+╚═══════════════════════════════════════════════════════════╝
+
+📦 GERENCIAMENTO DE PACOTES (ZYPPER)
+────────────────────────────────────────────────────────────
+  sudo zypper install <pacote>  # Instala (in/i)
+  sudo zypper remove <pacote>   # Remove (rm)
+  sudo zypper update            # Atualiza (up)
+  sudo zypper search <nome>     # Busca (se)
+  sudo zypper info <pacote>     # Info (if)
+  sudo zypper refresh           # Atualiza repos (ref)
+  sudo zypper dist-upgrade      # Upgrade completo (dup)
+
+📦 REPOSITÓRIOS
+────────────────────────────────────────────────────────────
+  sudo zypper addrepo <url> <nome>  # Adiciona repo
+  sudo zypper repos             # Lista repos
+
+💡 DICAS OPENSUSE
+────────────────────────────────────────────────────────────
+  • YaST = ferramenta de configuração central
+  • Tumbleweed = rolling release
+  • Leap = release estável
+  • Btrfs + snapshots nativos

@@ -136,24 +136,29 @@ impl CommandParser {
             return vec![exact_path];
         }
         
-        // Busca arquivos que começam com o nome parcial OU contêm o texto
+        // Busca arquivos que começam com o nome parcial OU contêm o texto.
+        //
+        // O filtro segue a ordem barato -> caro: primeiro o nome (em memória),
+        // só depois o tipo do arquivo. E o tipo vem de `entry.file_type()`, que
+        // no Linux usa o `d_type` do `readdir` — `entry.path().is_file()`
+        // montava um `PathBuf` e disparava um `stat` **por entrada**, e esta
+        // função roda a cada tecla digitada num `cat ...`.
+        let lowercase_partial = partial_name.to_lowercase();
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten() {
-                if let Some(name) = entry.file_name().to_str() {
-                    if entry.path().is_file() {
-                        // Corresponde se:
-                        // 1. Começa com o texto digitado (tex -> texto.txt)
-                        // 2. Contém o texto digitado (tex -> latex.txt)
-                        // 3. É muito similar (diferença de 1-2 caracteres)
-                        let lowercase_name = name.to_lowercase();
-                        let lowercase_partial = partial_name.to_lowercase();
-                        
-                        if lowercase_name.starts_with(&lowercase_partial) ||
-                           lowercase_name.contains(&lowercase_partial) ||
-                           Self::is_similar(&lowercase_name, &lowercase_partial) {
-                            matches.push(entry.path());
-                        }
-                    }
+                let file_name = entry.file_name();
+                let Some(name) = file_name.to_str() else { continue };
+
+                // Corresponde se:
+                // 1. Começa com o texto digitado (tex -> texto.txt)
+                // 2. Contém o texto digitado (tex -> latex.txt)
+                // 3. É muito similar (diferença de 1-2 caracteres)
+                let lowercase_name = name.to_lowercase();
+                let matched = lowercase_name.contains(&lowercase_partial)
+                    || Self::is_similar(&lowercase_name, &lowercase_partial);
+
+                if matched && entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
+                    matches.push(entry.path());
                 }
             }
         }

@@ -1,0 +1,32 @@
+╔═══════════════════════════════════════════════════════════╗
+║         GUIA FEDORA/RHEL - DNF/YUM                        ║
+╚═══════════════════════════════════════════════════════════╝
+
+📦 GERENCIAMENTO DE PACOTES (DNF)
+────────────────────────────────────────────────────────────
+  sudo dnf install <pacote>     # Instala pacote
+  sudo dnf remove <pacote>      # Remove pacote
+  sudo dnf upgrade              # Atualiza tudo
+  sudo dnf search <nome>        # Busca pacote
+  sudo dnf info <pacote>        # Info do pacote
+  sudo dnf autoremove           # Remove órfãos
+  sudo dnf clean all            # Limpa cache
+
+📦 REPOSITÓRIOS
+────────────────────────────────────────────────────────────
+  sudo dnf config-manager --add-repo <url>  # Adiciona repo
+  sudo dnf repolist             # Lista repos
+
+📦 RPM (Pacotes .rpm)
+────────────────────────────────────────────────────────────
+  sudo rpm -i pacote.rpm        # Instala .rpm
+  sudo rpm -e <pacote>          # Remove
+  rpm -qa                       # Lista instalados
+  rpm -qi <pacote>              # Info do pacote
+
+💡 DICAS FEDORA
+────────────────────────────────────────────────────────────
+  • DNF é sucessor do YUM (mais rápido)
+  • RPM Fusion para codecs/drivers proprietários
+  • Versão nova a cada 6 meses
+  • COPR = PPAs do Fedora

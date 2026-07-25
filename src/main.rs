@@ -159,12 +159,8 @@ fn handle_event(app: &mut App, event: Event) -> Result<()> {
                         }
                     }
                 }
-                KeyCode::PageUp => {
-                    app.scroll = app.scroll.saturating_sub(5);
-                }
-                KeyCode::PageDown => {
-                    app.scroll = app.scroll.saturating_add(5);
-                }
+                KeyCode::PageUp => app.scroll_by(-5),
+                KeyCode::PageDown => app.scroll_by(5),
                 _ => {}
             }
         }
@@ -177,19 +173,23 @@ fn handle_event(app: &mut App, event: Event) -> Result<()> {
             ) {
                 app.refresh_monitor();
             }
+
+            // Com a árvore visível, relê o diretório a 1 Hz para refletir
+            // mudanças feitas por fora (outro terminal, um script). Antes isso
+            // acontecia a cada frame — ou seja, a cada tecla digitada.
+            if matches!(app.right_panel_mode, app::RightPanelMode::FileTree { .. }) {
+                app.refresh_dir_cache();
+            }
         }
         Event::Resize => {
             // O Ratatui lida com resize automaticamente
             // Apenas re-renderiza no próximo loop
         }
         Event::Mouse(mouse_event) => {
+            use crossterm::event::MouseEventKind;
             match mouse_event.kind {
-                crossterm::event::MouseEventKind::ScrollDown => {
-                    app.scroll = app.scroll.saturating_add(1);
-                }
-                crossterm::event::MouseEventKind::ScrollUp => {
-                    app.scroll = app.scroll.saturating_sub(1);
-                }
+                MouseEventKind::ScrollDown => app.scroll_by(1),
+                MouseEventKind::ScrollUp => app.scroll_by(-1),
                 _ => {}
             }
         }

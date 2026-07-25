@@ -45,7 +45,7 @@ pub fn render_popup(frame: &mut Frame, app: &App) {
             Line::from(""),
             Line::from(vec![
                 Span::styled(
-                    "Pressione ESC para fechar",
+                    app.i18n.tc("ui-popup-close"),
                     Style::default()
                         .fg(Color::DarkGray)
                         .add_modifier(Modifier::ITALIC),

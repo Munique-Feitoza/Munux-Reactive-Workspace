@@ -1,0 +1,42 @@
+╔═══════════════════════════════════════════════════════════╗
+║        GUIA UBUNTU/DEBIAN - APT                           ║
+╚═══════════════════════════════════════════════════════════╝
+
+📦 GERENCIAMENTO DE PACOTES (APT)
+────────────────────────────────────────────────────────────
+  sudo apt update               # Atualiza lista de pacotes
+  sudo apt upgrade              # Atualiza pacotes instalados
+  sudo apt full-upgrade         # Atualiza + remove obsoletos
+  sudo apt install <pacote>     # Instala pacote
+  sudo apt remove <pacote>      # Remove pacote
+  sudo apt purge <pacote>       # Remove + configs
+  sudo apt autoremove           # Remove dependências órfãs
+  sudo apt search <nome>        # Busca pacote
+  sudo apt show <pacote>        # Mostra info do pacote
+  sudo apt clean                # Limpa cache
+
+📦 REPOSITÓRIOS (PPA)
+────────────────────────────────────────────────────────────
+  sudo add-apt-repository ppa:user/ppa  # Adiciona PPA
+  sudo add-apt-repository --remove ppa:user/ppa  # Remove PPA
+
+📦 DPKG (Pacotes .deb)
+────────────────────────────────────────────────────────────
+  sudo dpkg -i pacote.deb       # Instala .deb
+  sudo dpkg -r <pacote>         # Remove pacote
+  dpkg -l                       # Lista instalados
+  sudo apt --fix-broken install # Corrige dependências
+
+📦 SNAP
+────────────────────────────────────────────────────────────
+  sudo snap install <pacote>    # Instala snap
+  sudo snap remove <pacote>     # Remove snap
+  snap find <nome>              # Busca snap
+  snap refresh                  # Atualiza todos
+
+💡 DICAS DEBIAN/UBUNTU
+────────────────────────────────────────────────────────────
+  • Sempre 'sudo apt update' antes de 'apt install'
+  • use 'apt' em vez de 'apt-get' (mais moderno)
+  • PPAs podem causar conflitos - cuidado!
+  • LTS = Long Term Support (5 anos de atualizações)

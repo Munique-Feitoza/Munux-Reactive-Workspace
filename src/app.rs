@@ -1,6 +1,7 @@
 // Author: Munique Alves Pacheco Feitoza
 // License: GPLv3
 
+use crate::core::parser::CommandType;
 use crate::game::state::GameState;
 use anyhow::Result;
 use fluent::FluentArgs;
@@ -155,6 +156,26 @@ pub struct App {
     /// `Ctrl+L` apontam isto para o fim, limpando a tela **sem** perder o
     /// histórico navegável pelas setas.
     pub history_view_start: usize,
+
+    /// Listagem do diretório atual, memoizada (limitada a [`MAX_TREE_ENTRIES`]).
+    ///
+    /// `render_file_tree` roda a cada frame (toda tecla + tick de 1 s) e a
+    /// navegação por setas consulta a mesma lista. Sem cache, cada frame pagava
+    /// um `read_dir` + um `stat` por entrada + um sort O(n log n). Agora a
+    /// listagem é recalculada só por [`Self::refresh_dir_cache`]: ao trocar de
+    /// diretório, após comandos que mexem em arquivos e no tick de 1 s enquanto
+    /// a árvore está visível — mantendo a reatividade sem custo por tecla.
+    dir_cache: Vec<crate::core::filesystem::FileEntry>,
+
+    /// `true` quando o último `refresh_dir_cache` não conseguiu ler o diretório
+    /// (permissão negada, diretório removido). Distingue "vazio" de "ilegível"
+    /// sem que o render precise reabrir o diretório para descobrir.
+    dir_unreadable: bool,
+
+    /// Último preview lido do disco (`caminho -> conteúdo`). Enquanto a pessoa
+    /// digita `cat arquivo.txt` o painel reage a cada tecla; sem esta memoização
+    /// o arquivo inteiro era relido do disco a cada caractere.
+    preview_cache: Option<(PathBuf, String)>,
 }
 
 /// Mensagem de popup para o Ghost Mentor
@@ -179,10 +200,74 @@ const CANCEL_WORDS: &[&str] = &["sair", "exit", "stop", "parar", "cancel", "canc
 /// Máximo de entradas exibidas/navegáveis no painel de árvore de arquivos.
 pub const MAX_TREE_ENTRIES: usize = 20;
 
+/// Máximo de linhas guardadas da saída de um comando. Acima disso o texto é
+/// cortado e um aviso é anexado — ver [`App::sanitize_output`].
+const MAX_OUTPUT_LINES: usize = 2_000;
+
+/// Entrada já normalizada e pronta para despacho — ver [`App::prepare_command`].
+struct PreparedCommand {
+    /// O comando com aliases expandidos e sem espaços nas pontas.
+    command: String,
+    /// `true` quando este comando perigoso já passou pelo gate de confirmação
+    /// (a pessoa respondeu `sim`), então não deve pedir confirmação de novo.
+    danger_confirmed: bool,
+}
+
+/// O que fazer com a progressão depois de despachar um comando.
+enum Progress {
+    /// Comando real: alimenta conquistas e quests com o resultado da execução.
+    Settle { success: bool },
+    /// Nada a liquidar — comando da própria app (`stats`, `help`, `clear`),
+    /// easter egg, ou fluxo interrompido (bloqueio, confirmação pendente).
+    Skip,
+}
+
 /// Verifica se `word` é uma palavra de cancelamento (case-insensitive).
 fn is_cancel_word(word: &str) -> bool {
     let w = word.trim().to_lowercase();
     CANCEL_WORDS.contains(&w.as_str())
+}
+
+/// Chave Fluent do aviso exibido na zona de perigo, a partir do comando inteiro.
+///
+/// `rm` tem três graus de gravidade (raiz / recursivo / simples) e continua
+/// explícito; o resto virou tabela — antes era uma cadeia de 8 `else if` com
+/// CC 9 embutida no meio de `command_to_panel_mode`.
+///
+/// A ordem das regras é significativa (da mais específica para a mais genérica)
+/// e é a mesma de antes: `sudo` vem antes de `dd`, e assim por diante.
+fn danger_warning_key(command: &str) -> &'static str {
+    /// (gatilhos, chave Fluent). O primeiro gatilho encontrado vence.
+    const RULES: &[(&[&str], &str)] = &[
+        (&["dd"], "danger-dd"),
+        (&["mkfs", "fdisk", "parted"], "danger-fs"),
+        (&["chmod", "chown"], "danger-perm"),
+        (&["reboot", "shutdown", "poweroff"], "danger-power"),
+    ];
+
+    if command.contains("rm") {
+        if command.contains("-rf") || command.contains("-fr") {
+            // Alvo parece ser uma raiz/diretório inteiro (`/*` ou terminando em `/`).
+            return if command.contains("/*") || command.ends_with('/') {
+                "danger-rm-root"
+            } else {
+                "danger-rm-rf"
+            };
+        }
+        return "danger-rm";
+    }
+
+    // `sudo` casa por prefixo (não por substring): num `dd ... | sudo tee` o
+    // aviso relevante é o do `dd`, que é quem de fato destrói dados.
+    if command.starts_with("sudo") {
+        return "danger-sudo";
+    }
+
+    RULES
+        .iter()
+        .find(|(triggers, _)| triggers.iter().any(|t| command.contains(t)))
+        .map(|(_, key)| *key)
+        .unwrap_or("danger-generic")
 }
 
 impl App {
@@ -206,7 +291,7 @@ impl App {
             game_state.update_daily_streak();
         }
 
-        Ok(Self {
+        let mut app = Self {
             input_buffer: String::new(),
             command_history,
             history_index: None,
@@ -229,7 +314,13 @@ impl App {
             system_summary: crate::core::monitor::SystemSummary::default(),
             file_selection: 0,
             history_view_start: 0,
-        })
+            dir_cache: Vec::new(),
+            dir_unreadable: false,
+            preview_cache: None,
+        };
+
+        app.refresh_dir_cache();
+        Ok(app)
     }
 
     /// Limpa a tela (saída + scrollback visível) e volta ao painel inicial.
@@ -243,13 +334,38 @@ impl App {
     }
 
     /// Entradas do diretório atual (mesma lista do painel de árvore, limitada a
-    /// [`MAX_TREE_ENTRIES`]). Fonte única para render e navegação.
-    pub fn dir_entries(&self) -> Vec<crate::core::filesystem::FileEntry> {
-        let mut entries =
-            crate::core::filesystem::FileSystemManager::list_directory(&self.current_dir)
-                .unwrap_or_default();
-        entries.truncate(MAX_TREE_ENTRIES);
-        entries
+    /// [`MAX_TREE_ENTRIES`]). Fonte única para render e navegação — devolve o
+    /// cache, sem tocar no disco.
+    pub fn dir_entries(&self) -> &[crate::core::filesystem::FileEntry] {
+        &self.dir_cache
+    }
+
+    /// `true` quando o diretório atual não pôde ser lido (permissão, remoção).
+    pub fn dir_unreadable(&self) -> bool {
+        self.dir_unreadable
+    }
+
+    /// Relê o diretório atual e reconstrói o cache da árvore de arquivos.
+    /// Único ponto que toca o disco para listar; ver [`Self::dir_cache`].
+    pub fn refresh_dir_cache(&mut self) {
+        match crate::core::filesystem::FileSystemManager::list_directory(&self.current_dir) {
+            Ok(mut entries) => {
+                entries.truncate(MAX_TREE_ENTRIES);
+                self.dir_cache = entries;
+                self.dir_unreadable = false;
+            }
+            Err(_) => {
+                self.dir_cache.clear();
+                self.dir_unreadable = true;
+            }
+        }
+        // A seleção pode ter ficado além do fim depois de remover arquivos.
+        if self.file_selection >= self.dir_cache.len() {
+            self.file_selection = self.dir_cache.len().saturating_sub(1);
+        }
+
+        // O conteúdo memoizado pode ter ficado obsoleto junto com a listagem.
+        self.preview_cache = None;
     }
 
     /// `true` quando o navegador de arquivos está ativo: árvore visível e sem
@@ -261,7 +377,7 @@ impl App {
 
     /// Move a seleção do navegador (`delta` negativo = sobe).
     pub fn move_file_selection(&mut self, delta: i32) {
-        let len = self.dir_entries().len();
+        let len = self.dir_cache.len();
         if len == 0 {
             self.file_selection = 0;
             return;
@@ -276,19 +392,19 @@ impl App {
     /// Abre a entrada selecionada: entra no diretório ou mostra o preview do
     /// arquivo. Usa o campo `FileEntry.path`.
     pub fn open_selected_entry(&mut self) {
-        let entries = self.dir_entries();
-        let Some(entry) = entries.get(self.file_selection) else { return };
+        let Some(entry) = self.dir_cache.get(self.file_selection) else { return };
         let path = entry.path.clone();
+        let is_dir = entry.is_dir;
+        let name = entry.name.clone();
 
-        if entry.is_dir {
+        if is_dir {
             if let Some(p) = path.to_str() {
                 let _ = self.change_directory(p);
             }
             self.file_selection = 0;
         } else {
-            let language = crate::core::parser::CommandParser::detect_language(&entry.name);
-            let content = crate::core::filesystem::FileSystemManager::read_file_preview(&path)
-                .unwrap_or_default();
+            let language = crate::core::parser::CommandParser::detect_language(&name);
+            let content = self.read_preview(&path).unwrap_or_default();
             self.right_panel_mode = RightPanelMode::FilePreview { path, content, language };
             self.scroll = 0;
         }
@@ -304,11 +420,10 @@ impl App {
     }
 
     /// Atalho para traduzir uma chave com um único argumento string.
-    /// (Casos multi-argumento montam `FluentArgs` inline.)
+    /// (Casos multi-argumento montam `FluentArgs` inline.) Delega à fonte única
+    /// em [`crate::i18n::I18n::t1`], que a camada de UI também usa.
     fn t1(&self, key: &str, name: &'static str, value: impl Into<String>) -> String {
-        let mut args = FluentArgs::new();
-        args.set(name, value.into());
-        self.i18n.t(key, Some(&args))
+        self.i18n.t1(key, name, value)
     }
 
     /// Grava o progresso atual em disco (chamado após cada comando e ao sair).
@@ -422,7 +537,7 @@ impl App {
             self.last_output = self.i18n.tc("sys-tutorial-started");
             self.show_popup(
                 self.i18n.tc("sys-tutorial-mode-title"),
-                crate::game::tutorial::step_text(0),
+                crate::game::tutorial::step_text(0, &self.i18n),
                 PopupType::Tip,
             );
         }
@@ -450,7 +565,7 @@ impl App {
             self.tutorial = Some(next);
             self.show_popup(
                 self.i18n.tc("sys-tutorial-step-done-title"),
-                tutorial::step_text(next),
+                tutorial::step_text(next, &self.i18n),
                 PopupType::Success,
             );
         } else {
@@ -509,6 +624,30 @@ impl App {
         let summary = self.i18n.t("sys-bench-result", Some(&args));
         self.last_output = summary.clone();
         self.show_popup(self.i18n.tc("sys-bench-result-title"), summary, PopupType::Success);
+    }
+
+    /// Quantidade de linhas roláveis do painel direito atual. Painéis de altura
+    /// fixa (Welcome, Stats, árvore…) devolvem 0 e não rolam.
+    fn scrollable_lines(&self) -> usize {
+        match &self.right_panel_mode {
+            RightPanelMode::Help { content, .. }
+            | RightPanelMode::FilePreview { content, .. }
+            | RightPanelMode::CommandOutput(content) => content.lines().count(),
+            _ => 0,
+        }
+    }
+
+    /// Rola o painel direito, limitado ao conteúdo. Fonte única de scroll —
+    /// PageUp/PageDown e a roda do mouse passam por aqui.
+    ///
+    /// Antes cada um chamava `saturating_add`/`saturating_sub` direto no campo,
+    /// sem teto: bastava segurar PageDown para o painel virar uma área vazia sem
+    /// pista de como voltar.
+    pub fn scroll_by(&mut self, delta: i32) {
+        // Deixa a última linha alcançável, sem permitir passar dela.
+        let max = self.scrollable_lines().saturating_sub(1).min(u16::MAX as usize) as u16;
+        let target = i64::from(self.scroll) + i64::from(delta);
+        self.scroll = target.clamp(0, i64::from(max)) as u16;
     }
 
     /// Atualiza o buffer de input (chamado a cada tecla)
@@ -584,15 +723,40 @@ impl App {
         }
     }
     
-    /// Executa o comando atual
+    /// Executa o comando atual.
+    ///
+    /// Orquestrador em três tempos — **preparar** a entrada, **despachar** para
+    /// o handler certo e **liquidar** a progressão. Cada etapa vive numa função
+    /// própria; antes tudo isso era um único corpo de 382 linhas com CC 57.
     pub fn execute_command(&mut self) -> Result<()> {
-        use crate::game::achievements::AchievementChecker;
-        use crate::game::easter_eggs::EasterEggs;
-        use crate::game::logic;
-        use crate::core::parser::CommandParser;
-        
-        if self.input_buffer.trim().is_empty() {
+        // 1. Preparação: a entrada pode nem ser um comando (resposta de
+        //    confirmação, frase do benchmark) ou já ser consumida por um modo
+        //    ativo (alias, tutorial, sessão SSH).
+        let Some(prepared) = self.prepare_command() else {
             return Ok(());
+        };
+
+        // 2. Despacho.
+        let progress = self.dispatch_command(&prepared);
+
+        // 3. Liquidação: conquistas e quests só correm para comandos de verdade.
+        if let Progress::Settle { success } = progress {
+            self.settle_progress(&prepared.command, success);
+        }
+
+        self.clear_input();
+        Ok(())
+    }
+
+    /// Consome a entrada atual e devolve o comando pronto para despacho, ou
+    /// `None` quando a entrada já foi totalmente tratada aqui.
+    ///
+    /// Concentra tudo que **precede** um comando: gate de confirmação de perigo,
+    /// benchmark em andamento, histórico, expansão de alias, comandos de modo
+    /// (alias/benchmark/tutorial) e a sessão SSH ativa.
+    fn prepare_command(&mut self) -> Option<PreparedCommand> {
+        if self.input_buffer.trim().is_empty() {
+            return None;
         }
 
         // Gate de confirmação: se há um comando perigoso pendente, esta entrada é
@@ -608,24 +772,14 @@ impl App {
                 self.clear_input();
                 self.last_output = self.i18n.tc("sys-danger-cancelled");
                 self.right_panel_mode = RightPanelMode::Welcome;
-                return Ok(());
+                return None;
             }
         }
 
         // Modo benchmark ativo: a entrada é a frase digitada, não um comando.
         if self.benchmark.is_some() {
-            let typed = self.input_buffer.clone();
-            let mut words = typed.split_whitespace();
-            let is_cancel = words.next() == Some("benchmark")
-                && words.next().map(is_cancel_word).unwrap_or(false);
-            if is_cancel {
-                self.benchmark = None;
-                self.last_output = self.i18n.tc("sys-bench-cancelled");
-            } else {
-                self.finish_benchmark(&typed);
-            }
-            self.clear_input();
-            return Ok(());
+            self.resolve_benchmark_entry();
+            return None;
         }
 
         // Adiciona ao histórico (o comando confirmado já foi registrado na 1ª tentativa).
@@ -633,329 +787,431 @@ impl App {
             self.command_history.push(self.input_buffer.clone());
         }
         self.history_index = None;
-        
-        let command = self.input_buffer.clone().trim().to_string();
 
-        // Comandos de alias e expansão de aliases (não se aplicam em sessões SSH)
-        if self.ssh_session.is_none() && self.handle_alias_command(&command) {
-            return Ok(());
-        }
-        let command = if self.ssh_session.is_none() {
-            self.expand_alias(&command)
-        } else {
-            command
-        };
+        let command = self.input_buffer.trim().to_string();
 
-        // Benchmark: comando para iniciar o teste de digitação
-        if self.ssh_session.is_none() && self.handle_benchmark_command(&command) {
-            return Ok(());
-        }
-
-        // Tutorial interativo: comando de controle ou avanço de passo
-        if self.ssh_session.is_none() {
-            if self.handle_tutorial_command(&command) {
-                return Ok(());
-            }
-            self.advance_tutorial(&command);
-        }
-
-        // Lógica de Sessão SSH (extraída em handler próprio).
+        // Numa sessão SSH o que vale é o shell remoto: nem alias, nem tutorial,
+        // nem benchmark locais se aplicam.
         if self.ssh_session.is_some() {
             self.handle_ssh_session(&command);
-            return Ok(());
+            return None;
         }
 
-        // Comando para iniciar conexão SSH
-        if command.starts_with("ssh ") {
-            let parts: Vec<&str> = command.split_whitespace().collect();
-            if parts.len() >= 2 {
-                let target = parts[1]; // user@host
-                if target.contains('@') {
-                    let auth_parts: Vec<&str> = target.split('@').collect();
-                    let user = auth_parts[0];
-                    let host = auth_parts[1];
-                    
-                    self.last_output = {
-                        let mut args = FluentArgs::new();
-                        args.set("user", user);
-                        args.set("host", host);
-                        self.i18n.t("sys-ssh-connecting", Some(&args))
-                    };
-                    // Renderiza um frame antes de bloquear na conexão (idealmente seria async, mas TUI é sync)
-                    // Como não temos async runtime fácil aqui, vai bloquear brevemente
+        if self.handle_alias_command(&command) {
+            return None;
+        }
+        let command = self.expand_alias(&command);
 
-                    match crate::core::ssh::SshSession::connect(user, host) {
-                        Ok(session) => {
-                            let cwd = session.remote_cwd.clone();
-                            self.ssh_session = Some(session);
-                            self.last_output = {
-                                let mut args = FluentArgs::new();
-                                args.set("host", host);
-                                args.set("dir", cwd.clone());
-                                self.i18n.t("sys-ssh-connected", Some(&args))
-                            };
-                            self.right_panel_mode = RightPanelMode::Welcome; // Ou algum modo específico SSH
+        if self.handle_benchmark_command(&command) {
+            return None;
+        }
 
-                            let title = self.i18n.tc("sys-ssh-conn-title");
-                            let body = {
-                                let mut args = FluentArgs::new();
-                                args.set("user", user);
-                                args.set("host", host);
-                                args.set("dir", cwd.clone());
-                                self.i18n.t("sys-ssh-conn-body", Some(&args))
-                            };
-                            self.show_popup(title, body, PopupType::Success);
-                        }
-                        Err(e) => {
-                            self.last_output = {
-                                let mut args = FluentArgs::new();
-                                args.set("msg", e.to_string());
-                                self.i18n.t("sys-ssh-fail", Some(&args))
-                            };
-                            let title = self.i18n.tc("sys-ssh-fail-title");
-                            let body = {
-                                let mut args = FluentArgs::new();
-                                args.set("target", target);
-                                args.set("msg", e.to_string());
-                                self.i18n.t("sys-ssh-fail-body", Some(&args))
-                            };
-                            self.show_popup(title, body, PopupType::Warning);
-                        }
-                    }
-                    self.input_buffer.clear();
-                    return Ok(());
-                }
+        if self.handle_tutorial_command(&command) {
+            return None;
+        }
+        self.advance_tutorial(&command);
+
+        if self.handle_ssh_connect(&command) {
+            return None;
+        }
+
+        Some(PreparedCommand { danger_confirmed, command })
+    }
+
+    /// Avalia a entrada durante um benchmark ativo: `benchmark sair` cancela,
+    /// qualquer outra coisa é a frase digitada.
+    fn resolve_benchmark_entry(&mut self) {
+        let typed = self.input_buffer.clone();
+        let mut words = typed.split_whitespace();
+        let is_cancel = words.next() == Some("benchmark")
+            && words.next().map(is_cancel_word).unwrap_or(false);
+
+        if is_cancel {
+            self.benchmark = None;
+            self.last_output = self.i18n.tc("sys-bench-cancelled");
+        } else {
+            self.finish_benchmark(&typed);
+        }
+        self.clear_input();
+    }
+
+    /// Trata `ssh user@host` abrindo uma sessão remota. Retorna `true` se o
+    /// comando era uma conexão SSH (bem-sucedida ou não) e já foi processado.
+    fn handle_ssh_connect(&mut self, command: &str) -> bool {
+        let Some(target) = command
+            .strip_prefix("ssh ")
+            .and_then(|rest| rest.split_whitespace().next())
+        else {
+            return false;
+        };
+        // Sem `user@host` não é uma conexão: deixa cair no shell (`ssh --help`).
+        let Some((user, host)) = target.split_once('@') else {
+            return false;
+        };
+        let (user, host) = (user.to_string(), host.to_string());
+
+        let mut args = FluentArgs::new();
+        args.set("user", user.clone());
+        args.set("host", host.clone());
+        self.last_output = self.i18n.t("sys-ssh-connecting", Some(&args));
+
+        // A conexão bloqueia por um instante — o TUI é síncrono.
+        match crate::core::ssh::SshSession::connect(&user, &host) {
+            Ok(session) => {
+                let cwd = session.remote_cwd.clone();
+                self.ssh_session = Some(session);
+                self.right_panel_mode = RightPanelMode::Welcome;
+
+                let mut args = FluentArgs::new();
+                args.set("host", host.clone());
+                args.set("dir", cwd.clone());
+                self.last_output = self.i18n.t("sys-ssh-connected", Some(&args));
+
+                let mut args = FluentArgs::new();
+                args.set("user", user);
+                args.set("host", host);
+                args.set("dir", cwd);
+                let title = self.i18n.tc("sys-ssh-conn-title");
+                let body = self.i18n.t("sys-ssh-conn-body", Some(&args));
+                self.show_popup(title, body, PopupType::Success);
+            }
+            Err(e) => {
+                let msg = self.describe_ssh_error(&e);
+                self.last_output = self.t1("sys-ssh-fail", "msg", msg.clone());
+
+                let mut args = FluentArgs::new();
+                args.set("target", target);
+                args.set("msg", msg);
+                let title = self.i18n.tc("sys-ssh-fail-title");
+                let body = self.i18n.t("sys-ssh-fail-body", Some(&args));
+                self.show_popup(title, body, PopupType::Warning);
             }
         }
-        let cmd_type = CommandParser::classify_command(&command);
-        
-        // Verifica modo de segurança
-        if !CommandParser::is_safe_command(&command, self.game_state.safe_mode) {
-            self.last_output = self.i18n.tc("sys-access-denied");
-            // Mostra popup de aviso (usa PopupType::Warning)
-            self.show_popup(
-                self.i18n.tc("sys-access-denied-title"), 
-                self.i18n.tc("sys-access-denied-body"), 
-                PopupType::Warning
-            );
-            self.game_state.record_failure();
-            return Ok(());
+
+        self.input_buffer.clear();
+        true
+    }
+
+    /// Descreve uma falha de SSH no idioma do usuário.
+    ///
+    /// As falhas que a interface exibe são erros **tipados**
+    /// ([`crate::core::ssh::SshError`]) justamente para poderem ser traduzidas
+    /// aqui: o `core` não escolhe idioma. Erros que escapem da `libssh2` sem
+    /// tipagem própria são repassados como estão (texto da biblioteca, em
+    /// inglês) — melhor isso do que engolir a causa real.
+    fn describe_ssh_error(&self, error: &anyhow::Error) -> String {
+        use crate::core::ssh::SshError;
+
+        let Some(ssh_error) = error.downcast_ref::<SshError>() else {
+            return error.to_string();
+        };
+
+        let mut args = FluentArgs::new();
+        match ssh_error {
+            SshError::Connect { host, port } => {
+                args.set("host", host.clone());
+                args.set("port", *port);
+            }
+            SshError::HostKeyMismatch { host, known_hosts } => {
+                args.set("host", host.clone());
+                args.set("file", known_hosts.clone());
+            }
+            SshError::HostKeyUnverifiable { host } => args.set("host", host.clone()),
+            SshError::RemoteDirNotFound { path } => args.set("path", path.clone()),
+            SshError::Handshake | SshError::AuthFailed => {}
         }
 
-        if matches!(cmd_type, crate::core::parser::CommandType::Dangerous) {
+        self.i18n.t(ssh_error.message_key(), Some(&args))
+    }
+
+    /// Despacha o comando para o handler correspondente e diz se a progressão
+    /// deve ser liquidada.
+    fn dispatch_command(&mut self, prepared: &PreparedCommand) -> Progress {
+        use crate::core::parser::CommandParser;
+        use crate::game::achievements::AchievementChecker;
+        use crate::game::easter_eggs::EasterEggs;
+
+        let command = &prepared.command;
+        let cmd_type = CommandParser::classify_command(command);
+
+        // Modo seguro: comando bloqueado antes de qualquer efeito.
+        if !CommandParser::is_safe_command(command, self.game_state.safe_mode) {
+            self.last_output = self.i18n.tc("sys-access-denied");
+            self.show_popup(
+                self.i18n.tc("sys-access-denied-title"),
+                self.i18n.tc("sys-access-denied-body"),
+                PopupType::Warning,
+            );
+            self.game_state.record_failure();
+            return Progress::Skip;
+        }
+
+        if matches!(cmd_type, CommandType::Dangerous) {
             // Comando perigoso liberado (modo seguro desligado): exige confirmação
             // explícita em vez de executar direto no Enter.
-            if !danger_confirmed {
+            if !prepared.danger_confirmed {
                 self.pending_command = Some(command.clone());
                 self.clear_input();
                 self.last_output = self.i18n.tc("sys-danger-confirm");
-                self.right_panel_mode = self.command_to_panel_mode(&command);
-                return Ok(());
+                self.right_panel_mode = self.command_to_panel_mode(command, &cmd_type);
+                return Progress::Skip;
             }
             self.game_state.damage_integrity(10);
         }
 
-        // Verifica easter eggs primeiro
-        if let Some(easter_egg_output) = EasterEggs::check(&command) {
-            self.last_output = easter_egg_output.clone();
-            self.right_panel_mode = RightPanelMode::EasterEgg {
-                content: easter_egg_output,
-            };
-            
-            // Checa achievement de easter egg
-            if let Some(achievement) = AchievementChecker::check_easter_egg(&mut self.game_state, &command, &self.i18n) {
+        // Easter eggs vêm antes dos comandos internos.
+        if let Some(output) = EasterEggs::check(command, &self.i18n) {
+            self.last_output = output.clone();
+            self.right_panel_mode = RightPanelMode::EasterEgg { content: output };
+
+            if let Some(achievement) =
+                AchievementChecker::check_easter_egg(&mut self.game_state, command, &self.i18n)
+            {
                 self.award_achievement(achievement, false);
             }
-
             self.clear_input();
-            return Ok(());
-        }
-        
-        // Comandos especiais do Munux (stats/quests/achievements/tip/help).
-        if self.handle_special_command(&command) {
-            return Ok(());
+            return Progress::Skip;
         }
 
-        // Comandos internos (não executam via shell)
-        if command.starts_with("cd ") {
-            let path = Self::parse_cd_arg(&command);
-            // Regra de contagem: comandos reais (cd, ls, externos) contam para
-            // stats/quests; comandos do app (stats/help/tip/...) não. `cd` antes
-            // não incrementava — agora conta, igual ao `ls`.
-            match self.change_directory(path) {
-                Ok(_) => {
-                    self.last_output =
-                        self.t1("sys-cd-ok", "dir", self.current_dir.display().to_string());
-                    self.game_state.increment_commands();
-                    self.game_state.record_success();
-                    // Atualiza o painel para mostrar novo diretório
-                    self.right_panel_mode = RightPanelMode::FileTree {
-                        path: self.current_dir.clone()
-                    };
-                }
-                Err(e) => {
-                    self.last_output = self.t1("sys-error", "msg", e.to_string());
-                    self.game_state.increment_commands();
-                    self.game_state.record_failure();
-                }
+        // Comandos especiais do Munux (stats/quests/achievements/tip/help).
+        if self.handle_special_command(command) {
+            return Progress::Skip;
+        }
+
+        self.run_command(command, &cmd_type)
+    }
+
+    /// Executa o comando propriamente dito: os embutidos (`cd`, `ls`, `exit`,
+    /// `clear`, `xp` de debug) ou, no fim da linha, o shell do sistema.
+    fn run_command(&mut self, command: &str, cmd_type: &CommandType) -> Progress {
+        if let Some(path) = command.strip_prefix("cd ") {
+            return self.run_cd(path.trim());
+        }
+
+        // Comando secreto para testar progressão de nível — só em builds de
+        // debug. Em release o ramo é eliminado e `xp` cai no shell (sem cheat).
+        if cfg!(debug_assertions) {
+            if let Some(arg) = command.strip_prefix("xp ") {
+                self.run_xp_cheat(arg.trim());
+                return Progress::Settle { success: true };
             }
-        } else if cfg!(debug_assertions) && command.starts_with("xp ") {
-            // Comando secreto para testar progressão de nível — só em builds de
-            // debug. Em release o ramo é eliminado e `xp` cai no shell (sem cheat).
-            if let Ok(amount) = command.trim_start_matches("xp ").trim().parse::<u32>() {
-                let _old_level = self.game_state.level;
-                let leveled_up = self.game_state.add_xp(amount);
-                if leveled_up {
-                    self.last_output = format!(
-                        "{}: {} | {}: {} | XP: {} | {}",
-                        self.i18n.tc("ui-level"),
-                        self.game_state.level,
-                        self.i18n.tc("ui-rank"),
-                        self.game_state.get_rank(&self.i18n),
-                        self.game_state.xp,
-                        self.i18n.level_message(self.game_state.level)
-                    );
-                    self.game_state.refresh_quests(&self.i18n);
-                } else {
-                    let mut args = FluentArgs::new();
-                    args.set("amount", amount);
-                    args.set("current", self.game_state.xp);
-                    args.set("total", self.game_state.xp_to_next_level);
-                    args.set("next", self.game_state.level + 1);
-                    self.last_output = self.i18n.t("sys-xp-gain", Some(&args));
-                }
-            } else {
-                self.last_output = self.i18n.tc("sys-xp-usage");
-            }
-        } else if command == "exit" || command == "quit" {
+        }
+
+        if command == "exit" || command == "quit" {
             self.should_quit = true;
-        } else if command == "clear" || command == "cls" {
-            self.clear_screen(); // limpa buffer e tela; histórico navegável preservado
-            return Ok(());
-        } else if command.starts_with("ls") {
-            // ls não mostra output no painel esquerdo, só atualiza o direito
-            self.last_output = self.i18n.tc("sys-ls-listed");
-            self.right_panel_mode = RightPanelMode::FileTree { 
-                path: self.current_dir.clone() 
-            };
-            
-            // Sistema de XP dinâmico
-            let xp_reward = logic::calculate_xp_reward(&command, &cmd_type, true);
-            self.game_state.add_xp(xp_reward);
+            return Progress::Settle { success: true };
+        }
+
+        if command == "clear" || command == "cls" {
+            // limpa buffer e tela; histórico navegável preservado
+            self.clear_screen();
+            return Progress::Skip;
+        }
+
+        if crate::core::commands::is_listing(command.split_whitespace().next().unwrap_or("")) {
+            return self.run_listing(command, cmd_type);
+        }
+
+        self.run_shell(command, cmd_type)
+    }
+
+    /// `cd <caminho>`. Conta para stats/quests como qualquer comando real.
+    fn run_cd(&mut self, path: &str) -> Progress {
+        self.game_state.increment_commands();
+
+        match self.change_directory(path) {
+            Ok(_) => {
+                self.last_output =
+                    self.t1("sys-cd-ok", "dir", self.current_dir.display().to_string());
+                self.game_state.record_success();
+                self.right_panel_mode = RightPanelMode::FileTree {
+                    path: self.current_dir.clone(),
+                };
+                Progress::Settle { success: true }
+            }
+            Err(e) => {
+                self.last_output = self.t1("sys-error", "msg", e.to_string());
+                self.game_state.record_failure();
+                Progress::Settle { success: false }
+            }
+        }
+    }
+
+    /// `ls`/`ll`/`la`: sem output no painel esquerdo, só atualiza a árvore.
+    fn run_listing(&mut self, command: &str, cmd_type: &CommandType) -> Progress {
+        self.refresh_dir_cache();
+        self.last_output = self.i18n.tc("sys-ls-listed");
+        self.right_panel_mode = RightPanelMode::FileTree {
+            path: self.current_dir.clone(),
+        };
+
+        let xp = crate::game::logic::calculate_xp_reward(command, cmd_type, true);
+        self.game_state.add_xp(xp);
+        self.game_state.increment_commands();
+        self.game_state.record_success();
+
+        Progress::Settle { success: true }
+    }
+
+    /// Concede XP diretamente (cheat de desenvolvimento, só em build de debug).
+    fn run_xp_cheat(&mut self, arg: &str) {
+        let Ok(amount) = arg.parse::<u32>() else {
+            self.last_output = self.i18n.tc("sys-xp-usage");
+            return;
+        };
+
+        if self.game_state.add_xp(amount) {
+            self.last_output = format!(
+                "{}: {} | {}: {} | XP: {} | {}",
+                self.i18n.tc("ui-level"),
+                self.game_state.level,
+                self.i18n.tc("ui-rank"),
+                self.game_state.get_rank(&self.i18n),
+                self.game_state.xp,
+                self.i18n.level_message(self.game_state.level)
+            );
+            self.game_state.refresh_quests(&self.i18n);
+        } else {
+            let mut args = FluentArgs::new();
+            args.set("amount", amount);
+            args.set("current", self.game_state.xp);
+            args.set("total", self.game_state.xp_to_next_level);
+            args.set("next", self.game_state.level + 1);
+            self.last_output = self.i18n.t("sys-xp-gain", Some(&args));
+        }
+    }
+
+    /// Executa o comando no shell do sistema e reflete o resultado na UI.
+    fn run_shell(&mut self, command: &str, cmd_type: &CommandType) -> Progress {
+        use crate::core::shell::ShellExecutor;
+
+        // Injeta flags de cor para comandos comuns se não estiverem presentes.
+        let color_command = Self::prepare_color_command(command);
+
+        let output = match ShellExecutor::execute(&color_command, &self.current_dir) {
+            Ok(output) => output,
+            Err(e) => {
+                self.last_output = self.t1("sys-cmd-exec-error", "msg", e.to_string());
+                self.game_state.increment_commands();
+                self.game_state.record_failure();
+                return Progress::Settle { success: false };
+            }
+        };
+
+        // `output.success` é a fonte da verdade do resultado. Antes o sucesso era
+        // deduzido de `last_output.starts_with("✗")` — ou seja, a lógica de
+        // conquistas dependia do glifo de uma string traduzível.
+        let success = output.success;
+
+        let body = if success {
+            output.combined_output()
+        } else {
+            self.add_educational_hints(command, &output.combined_output())
+        };
+
+        self.last_output = self
+            .i18n
+            .tc(if success { "sys-cmd-ok" } else { "sys-cmd-error" });
+
+        self.right_panel_mode = RightPanelMode::CommandOutput(self.decorate_output(command, &body));
+        self.scroll = 0;
+
+        if success {
+            let old_level = self.game_state.level;
+            let xp = crate::game::logic::calculate_xp_reward(command, cmd_type, true);
+            let leveled_up = self.game_state.add_xp(xp);
             self.game_state.increment_commands();
             self.game_state.record_success();
-            
-            // Verifica conquistas (Removido daqui pois já é checado no final do execute_command via AchievementChecker)
-        } else {
-            // Executa comandos externos via shell
-            use crate::core::shell::ShellExecutor;
-            
-            // Injeta flags de cor para comandos comuns se não estiverem presentes
-            let color_command = Self::prepare_color_command(&command);
-            
-            match ShellExecutor::execute(&color_command, &self.current_dir) {
-                Ok(output) => {
-                    // Adiciona dicas educativas para erros comuns
-                    let helpful_output = if !output.success {
-                        self.add_educational_hints(&command, &output.combined_output())
-                    } else {
-                        output.combined_output()
-                    };
-                    
-                    self.last_output = if output.success {
-                        self.i18n.tc("sys-cmd-ok")
-                    } else {
-                        self.i18n.tc("sys-cmd-error")
-                    };
-                    
-                    // Define o conteúdo do painel direito com o output do comando com um prompt estilizado
-                    let display_output = {
-                        use crate::ui::theme::Theme;
-                        let symbol = Theme::get_prompt_symbol(self.game_state.level);
-                        let rank = self.game_state.get_rank(&self.i18n);
-                        // Prompt verde neon com o comando em ciano brilhante (ANSI)
-                        let prompt = format!("\x1b[1;32m{} [{}@munux]$ \x1b[0m\x1b[1;36m{}\x1b[0m", symbol, rank, command);
-                        format!("{}\n{}", prompt, Self::sanitize_output(&helpful_output))
-                    };
-                    
-                    self.right_panel_mode = RightPanelMode::CommandOutput(display_output);
-                    self.scroll = 0; // Reset scroll
-                    
-                    // Sistema de XP dinâmico baseado no comando
-                    let xp_reward = logic::calculate_xp_reward(&command, &cmd_type, output.success);
-                    if output.success {
-                        let old_level = self.game_state.level;
-                        let leveled_up = self.game_state.add_xp(xp_reward);
-                        self.game_state.increment_commands();
-                        self.game_state.record_success();
-                        self.game_state.restore_integrity(5); // Recupera integridade em comandos bem-sucedidos
-                        
-                        // Notificação de Level Up
-                        if leveled_up {
-                            self.show_level_up_popup(old_level, self.game_state.level);
-                            self.game_state.refresh_quests(&self.i18n);
-                            
-                            // Muda para painel de gamificação
-                            self.right_panel_mode = RightPanelMode::Gamification {
-                                message: {
-                                    let mut args = fluent::FluentArgs::new();
-                                    args.set("level", fluent::FluentValue::from(self.game_state.level));
-                                    self.i18n.t("sys-level-up-msg", Some(&args))
-                                },
-                                celebration: true,
-                            };
-                        }
-                        
-                        // Verifica conquistas (Removido daqui pois já é checado no final do execute_command via AchievementChecker)
-                    } else {
-                        self.game_state.increment_commands();
-                        self.game_state.record_failure();
-                        self.game_state.damage_integrity(3); // Perde integridade em erros
-                    }
-                    
-                    // Atualiza visualização da árvore de arquivos após comandos que podem modificar
-                    if command.starts_with("mkdir") || command.starts_with("touch") || 
-                       command.starts_with("rm ") || command.starts_with("mv ") || 
-                       command.starts_with("cp ") || command.starts_with("ls") {
-                        self.right_panel_mode = RightPanelMode::FileTree { 
-                            path: self.current_dir.clone() 
-                        };
-                    }
-                }
-                Err(e) => {
-                    self.last_output = self.t1("sys-cmd-exec-error", "msg", e.to_string());
-                    self.game_state.increment_commands();
-                    self.game_state.record_failure();
-                }
+            self.game_state.restore_integrity(5);
+
+            if leveled_up {
+                self.announce_level_up(old_level);
             }
+        } else {
+            self.game_state.increment_commands();
+            self.game_state.record_failure();
+            self.game_state.damage_integrity(3);
         }
-        
-        // Verifica achievements (comando, streak e nível)
-        let success = !self.last_output.starts_with("✗");
+
+        // O comando pode ter mexido no diretório (inclusive via redirecionamento),
+        // então a listagem em cache é refeita sempre — um `read_dir` por comando
+        // digitado, não por frame.
+        self.refresh_dir_cache();
+
+        // Já a troca de painel segue o catálogo (`core::commands`), não uma lista
+        // paralela de prefixos.
+        if crate::core::commands::mutates_files(command.split_whitespace().next().unwrap_or("")) {
+            self.right_panel_mode = RightPanelMode::FileTree {
+                path: self.current_dir.clone(),
+            };
+        }
+
+        Progress::Settle { success }
+    }
+
+    /// Prefixa a saída do comando com o prompt estilizado (ANSI) do painel direito.
+    fn decorate_output(&self, command: &str, body: &str) -> String {
+        use crate::ui::theme::Theme;
+
+        let symbol = Theme::get_prompt_symbol(self.game_state.level);
+        let rank = self.game_state.get_rank(&self.i18n);
+        // Prompt verde neon com o comando em ciano brilhante.
+        let prompt = format!(
+            "\x1b[1;32m{} [{}@munux]$ \x1b[0m\x1b[1;36m{}\x1b[0m",
+            symbol, rank, command
+        );
+        format!("{}\n{}", prompt, self.sanitize_output(body))
+    }
+
+    /// Popup + painel de celebração ao subir de nível.
+    fn announce_level_up(&mut self, old_level: u32) {
+        self.show_level_up_popup(old_level, self.game_state.level);
+        self.game_state.refresh_quests(&self.i18n);
+
+        let mut args = FluentArgs::new();
+        args.set("level", fluent::FluentValue::from(self.game_state.level));
+        self.right_panel_mode = RightPanelMode::Gamification {
+            message: self.i18n.t("sys-level-up-msg", Some(&args)),
+            celebration: true,
+        };
+    }
+
+    /// Liquida a progressão após um comando real: conquistas (comando, streak,
+    /// nível) e avanço das quests ativas.
+    fn settle_progress(&mut self, command: &str, success: bool) {
+        use crate::game::achievements::AchievementChecker;
+
         if let Some(achievement) =
-            AchievementChecker::check_command(&mut self.game_state, &command, success, &self.i18n)
+            AchievementChecker::check_command(&mut self.game_state, command, success, &self.i18n)
         {
             self.award_achievement(achievement, true);
         }
-        if let Some(achievement) = AchievementChecker::check_streak(&mut self.game_state, &self.i18n) {
+        if let Some(achievement) =
+            AchievementChecker::check_streak(&mut self.game_state, &self.i18n)
+        {
             self.award_achievement(achievement, false);
         }
-        if let Some(achievement) = AchievementChecker::check_level(&mut self.game_state, &self.i18n) {
+        if let Some(achievement) = AchievementChecker::check_level(&mut self.game_state, &self.i18n)
+        {
             self.award_achievement(achievement, false);
         }
-        
-        // Atualiza progresso das quests
+
+        // Avança as quests e coleta as que fecharam (o empréstimo mutável de
+        // `active_quests` termina antes de mexer no resto do estado).
         let current_level = self.game_state.level;
-        let mut completed_quests = Vec::new();
-        
-        for quest in &mut self.game_state.active_quests {
-            if quest.update_progress(&command, current_level) {
-                completed_quests.push((quest.title.clone(), quest.xp_reward));
-            }
-        }
-        
-        // Adiciona XP e mensagens das quests completadas
-        for (title, xp) in completed_quests {
+        let completed: Vec<(String, u32)> = self
+            .game_state
+            .active_quests
+            .iter_mut()
+            .filter(|q| !q.completed)
+            .filter_map(|quest| {
+                quest
+                    .update_progress(command, current_level)
+                    .then(|| (quest.title.clone(), quest.xp_reward))
+            })
+            .collect();
+
+        for (title, xp) in completed {
             let mut args = FluentArgs::new();
             args.set("title", title);
             args.set("xp", xp);
@@ -963,9 +1219,6 @@ impl App {
             self.last_output = format!("{}{}", self.last_output, quest_msg);
             self.game_state.add_xp(xp);
         }
-
-        self.clear_input();
-        Ok(())
     }
     
     /// Muda o diretório atual
@@ -986,6 +1239,9 @@ impl App {
                 self.current_dir = new_path.clone();
                 self.right_panel_mode = RightPanelMode::FileTree { path: new_path };
             }
+            // O diretório mudou: a listagem em cache não vale mais.
+            self.file_selection = 0;
+            self.refresh_dir_cache();
             Ok(())
         } else {
             anyhow::bail!("{}", self.t1("sys-cd-notfound", "path", path))
@@ -1046,13 +1302,12 @@ impl App {
                     };
                     self.last_output = self.t1("sys-help-cmd", "topic", topic);
                 } else {
-                    // Conteúdo e título vêm juntos da fonte única (sempre coerentes).
-                    let (content, title) = crate::game::distro_guide::DistroGuide::get(&topic);
-                    self.right_panel_mode = RightPanelMode::Help {
-                        content,
-                        title: title.to_string(),
-                    };
-                    self.last_output = self.t1("sys-help-showing-title", "title", title);
+                    // Conteúdo e título vêm juntos da fonte única (sempre
+                    // coerentes) e já no idioma ativo.
+                    let (content, title) =
+                        crate::game::distro_guide::DistroGuide::get(&topic, &self.i18n);
+                    self.last_output = self.t1("sys-help-showing-title", "title", title.clone());
+                    self.right_panel_mode = RightPanelMode::Help { content, title };
                 }
             } else {
                 self.right_panel_mode = RightPanelMode::Help {
@@ -1072,49 +1327,20 @@ impl App {
     ///
     /// Vive na camada `app` (não no `core`): produz `RightPanelMode` (tipo de UI)
     /// e usa `i18n`. O `core::parser` apenas classifica e busca arquivos.
-    fn command_to_panel_mode(&self, input: &str) -> RightPanelMode {
-        use crate::core::parser::{CommandParser, CommandType};
+    ///
+    /// Recebe `cmd_type` pronto: quem chama já classificou, e reclassificar aqui
+    /// dobrava o trabalho no caminho quente (uma vez por tecla digitada).
+    fn command_to_panel_mode(&self, input: &str, cmd_type: &CommandType) -> RightPanelMode {
+        use crate::core::parser::CommandParser;
 
-        let cmd_type = CommandParser::classify_command(input);
         let trimmed = input.trim();
         let current_dir = &self.current_dir;
 
         match cmd_type {
-            CommandType::Dangerous => {
-                let key = if trimmed.contains("rm")
-                    && (trimmed.contains("-rf") || trimmed.contains("-fr"))
-                {
-                    if trimmed.contains('/') && (trimmed.contains("/*") || trimmed.ends_with('/')) {
-                        "danger-rm-root"
-                    } else {
-                        "danger-rm-rf"
-                    }
-                } else if trimmed.contains("rm") {
-                    "danger-rm"
-                } else if trimmed.starts_with("sudo") {
-                    "danger-sudo"
-                } else if trimmed.contains("dd") {
-                    "danger-dd"
-                } else if trimmed.contains("mkfs")
-                    || trimmed.contains("fdisk")
-                    || trimmed.contains("parted")
-                {
-                    "danger-fs"
-                } else if trimmed.contains("chmod") || trimmed.contains("chown") {
-                    "danger-perm"
-                } else if trimmed.contains("reboot")
-                    || trimmed.contains("shutdown")
-                    || trimmed.contains("poweroff")
-                {
-                    "danger-power"
-                } else {
-                    "danger-generic"
-                };
-                RightPanelMode::DangerZone {
-                    warning: self.i18n.tc(key),
-                    command: trimmed.to_string(),
-                }
-            }
+            CommandType::Dangerous => RightPanelMode::DangerZone {
+                warning: self.i18n.tc(danger_warning_key(trimmed)),
+                command: trimmed.to_string(),
+            },
 
             CommandType::FileViewing => {
                 let parts: Vec<&str> = trimmed.split_whitespace().collect();
@@ -1155,12 +1381,9 @@ impl App {
                 }
             }
 
-            CommandType::SystemMonitoring => RightPanelMode::ResourceMonitor {
-                cpu_usage: 0.0,
-                memory_used: 0,
-                memory_total: 0,
-                process_count: 0,
-            },
+            // Parte do último resumo conhecido em vez de zeros: evita um frame
+            // com gauges zerados antes do `refresh_monitor` do chamador.
+            CommandType::SystemMonitoring => RightPanelMode::resource_from(&self.system_summary),
 
             _ => RightPanelMode::FileTree { path: current_dir.clone() },
         }
@@ -1168,10 +1391,10 @@ impl App {
 
     /// Analisa o input em tempo real e atualiza o modo do painel direito
     fn analyze_input(&mut self) {
-        use crate::core::parser::{CommandParser, CommandType};
+        use crate::core::parser::CommandParser;
 
         let input = self.input_buffer.trim();
-        
+
         if self.ssh_session.is_some() {
             // Em modo SSH, desabilita a análise reativa de arquivos locais
             return;
@@ -1185,63 +1408,92 @@ impl App {
             self.danger_mode_active = false;
             return;
         }
-        
-        // Classifica o tipo de comando
+
+        // Classifica uma única vez e repassa: `command_to_panel_mode` reaproveita.
         let cmd_type = CommandParser::classify_command(input);
-        
-        // Comandos especiais do Munux mantém o painel atual ou mudam conforme necessário
-        match cmd_type {
-            CommandType::MunuxSpecial => {
-                // Não muda o painel aqui - será mudado no execute_command
-                return;
-            }
-            CommandType::EasterEgg => {
-                // Easter eggs serão processados no execute_command
-                return;
-            }
-            _ => {}
+
+        // Comandos especiais e easter eggs não mexem no painel agora — quem
+        // decide é o `execute_command`.
+        if matches!(cmd_type, CommandType::MunuxSpecial | CommandType::EasterEgg) {
+            return;
         }
-        
+
         // Determina o modo do painel (camada app, com i18n)
-        let mode = self.command_to_panel_mode(input);
-        
-        // Se o parser retornar FileTree mas não for comando de listagem, volta para Welcome
-        let is_listing = ["ls", "ll", "la"].iter().any(|c| input.starts_with(c));
-        if matches!(mode, RightPanelMode::FileTree { .. }) && !is_listing {
+        let mode = self.command_to_panel_mode(input, &cmd_type);
+
+        // O painel de árvore só aparece em comando de listagem de verdade. A
+        // comparação é por token exato (`core::commands`): com `starts_with`,
+        // `lsof` e `last` abriam a árvore.
+        let base = input.split_whitespace().next().unwrap_or("");
+        if matches!(mode, RightPanelMode::FileTree { .. })
+            && !crate::core::commands::is_listing(base)
+        {
             self.right_panel_mode = RightPanelMode::Welcome;
             self.danger_mode_active = false;
             return;
         }
-        
+
         self.right_panel_mode = mode;
-        
+
         // Atualiza o flag de perigo
         self.danger_mode_active = matches!(
             self.right_panel_mode,
             RightPanelMode::DangerZone { .. }
         );
-        
+
         // Se estiver em modo monitor, atualiza as métricas (instância única).
         if matches!(self.right_panel_mode, RightPanelMode::ResourceMonitor { .. }) {
             self.refresh_monitor();
         }
-        
-        // Se for preview de arquivo, tenta carregar o conteúdo
-        if let RightPanelMode::FilePreview { ref path, .. } = self.right_panel_mode {
-            use crate::core::filesystem::FileSystemManager;
-            if let Ok(content) = FileSystemManager::read_file_preview(path) {
-                let language = crate::core::parser::CommandParser::detect_language(
-                    path.file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("")
-                );
-                self.right_panel_mode = RightPanelMode::FilePreview {
-                    path: path.clone(),
-                    content,
-                    language,
-                };
-            }
+
+        self.load_preview_content();
+    }
+
+    /// Preenche o conteúdo de um `FilePreview` que veio vazio do
+    /// `command_to_panel_mode`.
+    ///
+    /// O conteúdo é memoizado por caminho: sem isso, digitar `cat arquivo.txt`
+    /// relia o arquivo inteiro (até 1 MB) do disco **a cada caractere digitado**.
+    fn load_preview_content(&mut self) {
+        let RightPanelMode::FilePreview { path, content, .. } = &self.right_panel_mode else {
+            return;
+        };
+        if !content.is_empty() {
+            return; // já veio preenchido (mensagem de erro/sugestões)
         }
+        let path = path.clone();
+
+        let content = match &self.preview_cache {
+            Some((cached_path, cached)) if *cached_path == path => cached.clone(),
+            _ => match self.read_preview(&path) {
+                Some(text) => {
+                    self.preview_cache = Some((path.clone(), text.clone()));
+                    text
+                }
+                None => return,
+            },
+        };
+
+        let language = crate::core::parser::CommandParser::detect_language(
+            path.file_name().and_then(|n| n.to_str()).unwrap_or(""),
+        );
+        self.right_panel_mode = RightPanelMode::FilePreview { path, content, language };
+    }
+
+    /// Lê um arquivo para preview e já anexa, traduzido, o aviso de corte que o
+    /// `core` sinaliza como dado (`FilePreview::truncated_at`).
+    fn read_preview(&self, path: &std::path::Path) -> Option<String> {
+        use crate::core::filesystem::FileSystemManager;
+
+        let preview = FileSystemManager::read_file_preview(path).ok()?;
+        let Some(total) = preview.truncated_at else {
+            return Some(preview.content);
+        };
+        Some(format!(
+            "{}\n\n{}",
+            self.t1("ui-file-too-large", "bytes", total.to_string()),
+            preview.content
+        ))
     }
     
     /// Mostra um popup (Ghost Mentor)
@@ -1396,35 +1648,41 @@ impl App {
 
         if command.starts_with("cd ") {
             let path = Self::parse_cd_arg(command);
-            match ssh_session.change_dir(path) {
-                Ok(_) => {
-                    let mut args = FluentArgs::new();
-                    args.set("dir", ssh_session.remote_cwd.clone());
-                    self.last_output = self.i18n.t("sys-ssh-cd-ok", Some(&args));
+            // O empréstimo mutável termina no `map`: `describe_ssh_error` e
+            // `t1` precisam de `&self`.
+            let moved = ssh_session.change_dir(path).map(|_| ssh_session.remote_cwd.clone());
+
+            match moved {
+                Ok(cwd) => {
+                    self.last_output = self.t1("sys-ssh-cd-ok", "dir", cwd);
                     self.right_panel_mode =
                         RightPanelMode::CommandOutput(self.last_output.clone());
                 }
                 Err(e) => {
-                    let mut args = FluentArgs::new();
-                    args.set("msg", e.to_string());
-                    self.last_output = self.i18n.t("sys-error", Some(&args));
+                    // Passa pela tradução: o `core` devolve `SshError` tipado.
+                    let msg = self.describe_ssh_error(&e);
+                    self.last_output = self.t1("sys-error", "msg", msg);
                 }
             }
         } else {
             // Mesma injeção de cores do shell local (git/ls/grep/pacman/yay/tree/ip).
             let cmd_to_run = Self::prepare_color_command(command);
-            match ssh_session.execute(&cmd_to_run) {
-                Ok((stdout, stderr, _code)) => {
-                    let output = if !stdout.is_empty() { stdout } else { stderr };
-                    let prompt = format!(
-                        "\x1b[1;36m{}@{} \x1b[0m\x1b[1;33m{}\x1b[0m$ \x1b[1m{}\x1b[0m",
-                        ssh_session.user, ssh_session.host, ssh_session.remote_cwd, command
-                    );
-                    self.last_output = Self::sanitize_output(&output);
-                    self.right_panel_mode = RightPanelMode::CommandOutput(format!(
-                        "{}\n{}",
-                        prompt, self.last_output
-                    ));
+            // O empréstimo mutável de `ssh_session` termina aqui: `sanitize_output`
+            // precisa de `&self` (usa i18n para o aviso de truncamento).
+            let executed = ssh_session.execute(&cmd_to_run).map(|(stdout, stderr, _code)| {
+                let output = if !stdout.is_empty() { stdout } else { stderr };
+                let prompt = format!(
+                    "\x1b[1;36m{}@{} \x1b[0m\x1b[1;33m{}\x1b[0m$ \x1b[1m{}\x1b[0m",
+                    ssh_session.user, ssh_session.host, ssh_session.remote_cwd, command
+                );
+                (prompt, output)
+            });
+
+            match executed {
+                Ok((prompt, output)) => {
+                    self.last_output = self.sanitize_output(&output);
+                    self.right_panel_mode =
+                        RightPanelMode::CommandOutput(format!("{}\n{}", prompt, self.last_output));
                 }
                 Err(e) => {
                     let mut args = FluentArgs::new();
@@ -1437,10 +1695,35 @@ impl App {
         self.input_buffer.clear();
     }
 
-    /// Limpa e sanitiza o output para evitar quebras no TUI
-    fn sanitize_output(content: &str) -> String {
-        content.replace('\t', "    ") // Expande tabs para espaços para evitar saltos de cursor bugados
-               .replace('\r', "")      // Remove carriage returns que podem causar sobreposição de texto
+    /// Limpa, limita e sanitiza o output para exibição no TUI. Devolve o texto
+    /// pronto, já com o aviso de truncamento traduzido quando houve corte.
+    ///
+    /// O teto de [`MAX_OUTPUT_LINES`] não é cosmético: a saída fica guardada no
+    /// `RightPanelMode::CommandOutput` e é **reconvertida de ANSI a cada frame**
+    /// (toda tecla + tick de 1 s). Sem limite, um `cat` de arquivo grande fazia
+    /// o custo por frame — e o consumo de memória — crescer sem fronteira.
+    fn sanitize_output(&self, content: &str) -> String {
+        // Passada única: conta o total e guarda só as primeiras linhas.
+        let mut kept: Vec<String> = Vec::new();
+        let mut total = 0usize;
+        for line in content.lines() {
+            total += 1;
+            if kept.len() < MAX_OUTPUT_LINES {
+                // Tabs saltam o cursor e `\r` sobrepõe texto no TUI.
+                kept.push(line.replace('\t', "    ").replace('\r', ""));
+            }
+        }
+
+        let mut out = kept.join("\n");
+        if total > kept.len() {
+            out.push('\n');
+            out.push_str(&self.t1(
+                "sys-output-truncated",
+                "lines",
+                (total - kept.len()).to_string(),
+            ));
+        }
+        out
     }
 
     /// Injeta flags de cor para comandos comuns em ambientes sem TTY

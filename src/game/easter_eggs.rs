@@ -8,8 +8,14 @@
 //! [`EasterEggs::achievement`] diz qual conquista (se houver) ele concede. Isso
 //! evita duplicar a lista de comandos entre a saída visual e o sistema de
 //! conquistas.
+//!
+//! A **arte e o texto** ficam em `locales/<lang>/eggs/<egg>.txt`, carregados por
+//! [`crate::i18n::I18n::content`]. Antes estavam embutidos aqui em blocos
+//! `r#"..."#` com o texto fixo em português. Alguns eggs citam obras em inglês
+//! (Matrix, Portal, Hackers) e são idênticos nos dois idiomas de propósito —
+//! citação não se traduz.
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use crate::i18n::I18n;
 
 /// Quantos easter eggs distintos é preciso encontrar para virar "caçador".
 pub const HUNTER_THRESHOLD: usize = 5;
@@ -34,6 +40,47 @@ pub enum Egg {
     VimEscape,
     StarWars,
 }
+
+impl Egg {
+    /// Nome do arquivo em `locales/<lang>/eggs/`, sem extensão.
+    ///
+    /// `Cowsay` e `Fortune` devolvem `None`: são gerados em tempo de execução
+    /// (a fala do usuário / uma citação sorteada), não lidos de um arquivo.
+    fn content_file(self) -> Option<&'static str> {
+        let name = match self {
+            Egg::Train => "train",
+            Egg::Matrix => "matrix",
+            Egg::SudoSu => "sudo_su",
+            Egg::Nuke => "nuke",
+            Egg::Whoami => "whoami",
+            Egg::HackThePlanet => "hack_the_planet",
+            Egg::Konami => "konami",
+            Egg::Sandwich => "sandwich",
+            Egg::SandwichSudo => "sandwich_sudo",
+            Egg::Answer42 => "answer42",
+            Egg::Xyzzy => "xyzzy",
+            Egg::Cake => "cake",
+            Egg::VimEscape => "vim_escape",
+            Egg::StarWars => "star_wars",
+            Egg::Cowsay | Egg::Fortune => return None,
+        };
+        Some(name)
+    }
+}
+
+/// Citações do `fortune`. Ficam no código, e não nos locales, porque são
+/// citações originais em inglês — traduzi-las descaracterizaria a fala.
+const FORTUNES: &[&str] = &[
+    "Talk is cheap. Show me the code. - Linus Torvalds",
+    "In a world without walls and fences, who needs windows and gates?",
+    "I'm doing a (free) operating system (just a hobby, won't be big and professional like gnu) - Linus Torvalds, 1991",
+    "Software is like sex: it's better when it's free. - Linus Torvalds",
+    "Intelligence is the ability to avoid doing work, yet getting the work done. - Linus Torvalds",
+    "Real programmers don't use tabs. Real programmers don't use spaces. Real programmers use cats walking on their keyboard.",
+    "There are only two hard things in Computer Science: cache invalidation and naming things. - Phil Karlton",
+    "Weeks of programming can save you hours of planning.",
+    "A computer is like air conditioning - it becomes useless when you open Windows.",
+];
 
 /// Easter eggs do terminal.
 pub struct EasterEggs;
@@ -72,9 +119,9 @@ impl EasterEggs {
         Some(egg)
     }
 
-    /// Saída visual de um easter egg. Mantida como API de compatibilidade.
-    pub fn check(command: &str) -> Option<String> {
-        Self::classify(command).map(|egg| Self::render(egg, command))
+    /// Saída visual de um easter egg, no idioma ativo.
+    pub fn check(command: &str, i18n: &I18n) -> Option<String> {
+        Self::classify(command).map(|egg| Self::render(egg, command, i18n))
     }
 
     /// `(id da conquista, XP)` para os easter eggs que concedem conquista.
@@ -97,67 +144,35 @@ impl EasterEggs {
         Some(pair)
     }
 
-    /// Renderiza a arte/texto do easter egg.
-    fn render(egg: Egg, command: &str) -> String {
+    /// Renderiza a arte/texto do easter egg no idioma ativo.
+    ///
+    /// Os que vêm de arquivo saem por [`Egg::content_file`]; só os dois
+    /// dinâmicos — `cowsay` (repete a fala) e `fortune` (sorteia uma citação) —
+    /// têm tratamento próprio.
+    fn render(egg: Egg, command: &str, i18n: &I18n) -> String {
         match egg {
-            Egg::Train => Self::train_animation(),
             Egg::Cowsay => {
                 let message = command.to_lowercase().replace("cowsay", "").trim().to_string();
-                Self::cowsay(if message.is_empty() {
-                    "Moo! Use: cowsay <mensagem>"
-                } else {
-                    &message
-                })
+                let message =
+                    if message.is_empty() { i18n.tc("egg-cowsay-default") } else { message };
+                Self::cowsay(&message)
             }
-            Egg::Fortune => Self::fortune(),
-            Egg::Matrix => Self::matrix_message(),
-            Egg::SudoSu => Self::sudo_su(),
-            Egg::Nuke => Self::nuke_warning(),
-            Egg::Whoami => Self::whoami(),
-            Egg::HackThePlanet => Self::hack_the_planet(),
-            Egg::Konami => Self::konami_code(),
-            Egg::Sandwich => Self::sandwich(false),
-            Egg::SandwichSudo => Self::sandwich(true),
-            Egg::Answer42 => Self::answer_42(),
-            Egg::Xyzzy => Self::xyzzy(),
-            Egg::Cake => Self::cake(),
-            Egg::VimEscape => Self::vim_escape(),
-            Egg::StarWars => Self::star_wars(),
+            Egg::Fortune => {
+                format!("\n💭 {}\n", FORTUNES[crate::game::rng::index(FORTUNES.len())])
+            }
+            _ => egg
+                .content_file()
+                .and_then(|name| i18n.content(&format!("eggs/{}.txt", name)))
+                .unwrap_or_default()
+                .to_string(),
         }
     }
 
-    /// Índice pseudo-aleatório derivado do relógio (sem dependências externas).
-    fn clock_index(len: usize) -> usize {
-        if len == 0 {
-            return 0;
-        }
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs() as usize)
-            .unwrap_or(0)
-            % len
-    }
-
-    fn train_animation() -> String {
-        r#"
-      ====        ________                ___________
-  _D _|  |_______/        \__I_I_____===__|_________|
-   |(_)---  |   H\________/ |   |        =|___ ___|      _________________
-   /     |  |   H  |  |     |   |         ||_| |_||     _|                \_____
-  |      |  |   H  |__--------------------| [___] |   =|                        |
-  | ________|___H__/__|_____/[][]~\_______|       |   -|                        |
-  |/ |   |-----------I_____I [][] []  D   |=======|____|________________________|_
-__/ =| o |=-~~\  /~~\  /~~\  /~~\ ____Y___________|__|__________________________|_
- |/-=|___|=    ||    ||    ||    |_____/~\___/          |_D__D__D_|  |_D__D__D_|
-  \_/      \_O=====O=====O=====O/      \_/               \_/   \_/    \_/   \_/
-
-Ops! Você quis dizer 'ls'? 🚂
-"#
-        .to_string()
-    }
-
+    /// Monta o balão de fala da vaca em volta de `message`.
     fn cowsay(message: &str) -> String {
-        let border = "-".repeat(message.len() + 2);
+        // A largura da borda acompanha os **caracteres**, não os bytes: com
+        // `len()` um "olá" acentuado desalinhava o balão.
+        let border = "-".repeat(message.chars().count() + 2);
         format!(
             r#"
  {border}
@@ -171,235 +186,16 @@ Ops! Você quis dizer 'ls'? 🚂
 "#
         )
     }
-
-    fn fortune() -> String {
-        const FORTUNES: &[&str] = &[
-            "Talk is cheap. Show me the code. - Linus Torvalds",
-            "In a world without walls and fences, who needs windows and gates?",
-            "I'm doing a (free) operating system (just a hobby, won't be big and professional like gnu) - Linus Torvalds, 1991",
-            "Software is like sex: it's better when it's free. - Linus Torvalds",
-            "Intelligence is the ability to avoid doing work, yet getting the work done. - Linus Torvalds",
-            "Real programmers don't use tabs. Real programmers don't use spaces. Real programmers use cats walking on their keyboard.",
-            "There are only two hard things in Computer Science: cache invalidation and naming things. - Phil Karlton",
-            "Weeks of programming can save you hours of planning.",
-            "A computer is like air conditioning - it becomes useless when you open Windows.",
-        ];
-        format!("\n💭 {}\n", FORTUNES[Self::clock_index(FORTUNES.len())])
-    }
-
-    fn matrix_message() -> String {
-        r#"
-Wake up, Neo...
-The Matrix has you...
-Follow the white rabbit.
-
-🐰 Knock, knock, Neo.
-
-[ACCESSING MAINFRAME...]
-[BYPASSING SECURITY...]
-[DOWNLOADING DATA...]
-█████████████████████ 100%
-
-Welcome to the real world.
-"#
-        .to_string()
-    }
-
-    fn sudo_su() -> String {
-        r#"
-╔═══════════════════════════════════════╗
-║                                       ║
-║   Com grandes poderes vêm grandes     ║
-║   responsabilidades.                  ║
-║                                       ║
-║   Você agora tem poder ROOT.          ║
-║   Use com sabedoria.                  ║
-║                                       ║
-║              - Uncle Ben              ║
-║                                       ║
-╚═══════════════════════════════════════╝
-"#
-        .to_string()
-    }
-
-    fn nuke_warning() -> String {
-        r#"
-⚠️  ☢️  ⚠️  ALERTA NUCLEAR  ⚠️  ☢️  ⚠️
-
-Você tentou deletar o UNIVERSO INTEIRO!
-
-Por favor, não faça isso. Existem pessoas
-(e gatos) que dependem deste sistema.
-
-Este comando foi bloqueado para sua segurança
-e a segurança do mundo digital.
-
-Se você REALMENTE quer destruir tudo:
-  1. Isso é uma má ideia
-  2. Sério, não faça isso
-  3. Vai destruir TUDO
-  4. Não diga que não avisei
-
-COMANDO BLOQUEADO! ❌
-"#
-        .to_string()
-    }
-
-    fn whoami() -> String {
-        r#"
-Você é...
-
-Um hacker? 👨‍💻
-Um aprendiz? 🎓
-Um curioso? 🤔
-Um rebelde? 😎
-
-Você é quem você escolhe ser.
-
-No Munux, você está no caminho
-para se tornar uma LENDA! 🚀
-"#
-        .to_string()
-    }
-
-    fn hack_the_planet() -> String {
-        r#"
-🌍 HACK THE PLANET! 🌍
-
-"They're trashing our rights! Trashing!
-Trashing! Trashing!"
-
-Access granted to Gibson mainframe...
-Downloading all files...
-███████████████████████ 100%
-
-ZERO COOL IS HERE!
-
-Congratulations, you've been 1337 since 1995! 🎮
-"#
-        .to_string()
-    }
-
-    fn konami_code() -> String {
-        r#"
-🎮 KONAMI CODE ATIVADO! 🎮
-
-┏━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃   30 VIDAS DESBLOQUEADAS  ┃
-┃   XP BOOST x2 ATIVADO     ┃
-┃   GOD MODE: ON            ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-Achievement desbloqueado:
-"Old School Gamer" 🕹️
-"#
-        .to_string()
-    }
-
-    fn sandwich(as_sudo: bool) -> String {
-        if as_sudo {
-            r#"
-🥪 Okay.
-
-(Você fez sudo. Agora é root. O sanduíche é seu.)
-
-   _________________
-  /                 \
- |  🥬 🍅 🧀 🥓 🍞  |
-  \_________________/
-
-— xkcd #149
-"#
-            .to_string()
-        } else {
-            r#"
-🤨 O que? Faça você mesmo.
-
-(Dica: tente com 'sudo'.)
-
-— xkcd #149
-"#
-            .to_string()
-        }
-    }
-
-    fn answer_42() -> String {
-        r#"
-        4 2
-
-A Resposta para a Pergunta Fundamental
-sobre a Vida, o Universo e Tudo Mais.
-
-Pena que ninguém sabe qual era a pergunta.
-
-🐬 "So long, and thanks for all the fish."
-        — Douglas Adams
-"#
-        .to_string()
-    }
-
-    fn xyzzy() -> String {
-        r#"
-Nothing happens.
-
-(Mas você claramente já jogou Colossal Cave Adventure. Respeito. 🗿)
-"#
-        .to_string()
-    }
-
-    fn cake() -> String {
-        r#"
-        ,,,,,
-       ;;;;;;;
-      |_______|
-      |   🕯   |
-   ___|_______|___
-  |               |
-  |   THE CAKE    |
-  |   IS A LIE    |
-  |_______________|
-
-This was a triumph. I'm making a note here: HUGE SUCCESS.
-        — GLaDOS, Portal
-"#
-        .to_string()
-    }
-
-    fn vim_escape() -> String {
-        r#"
-Você não está no Vim. 😏
-
-Mas que reflexo, hein? Anos de :wq na memória muscular.
-
-(Para sair do Munux de verdade: Ctrl+C)
-"#
-        .to_string()
-    }
-
-    fn star_wars() -> String {
-        r#"
-        ✦        .          ✦
-   .          ___________          .
-        ____  /          /\
-   ✦   /   /\/          /  \    .
-      /   /  \         /    \        ✦
-     /___/    \_______/______\
-     \   \    /       \      /
-   .  \   \  /         \    /   ✦
-       \___\/___________\__/
-              STAR WARS
-
-May the Force be with you.
-
-(Dica nerd: telnet towel.blinkenlights.nl roda o Episódio IV inteiro em ASCII.)
-"#
-        .to_string()
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::i18n::Language;
+
+    fn i18n() -> I18n {
+        I18n::new(Language::PtBr)
+    }
 
     #[test]
     fn classifies_known_commands() {
@@ -413,9 +209,10 @@ mod tests {
 
     #[test]
     fn check_returns_output_for_eggs() {
-        assert!(EasterEggs::check("sl").is_some());
-        assert!(EasterEggs::check("xyzzy").unwrap().contains("Nothing happens"));
-        assert!(EasterEggs::check("git status").is_none());
+        let i18n = i18n();
+        assert!(EasterEggs::check("sl", &i18n).is_some());
+        assert!(EasterEggs::check("xyzzy", &i18n).unwrap().contains("Nothing happens"));
+        assert!(EasterEggs::check("git status", &i18n).is_none());
     }
 
     #[test]
@@ -428,5 +225,93 @@ mod tests {
             EasterEggs::achievement(Egg::Sandwich),
             EasterEggs::achievement(Egg::SandwichSudo)
         );
+    }
+
+    /// Todo egg baseado em arquivo precisa ter conteúdo nos dois idiomas —
+    /// senão o painel abriria vazio.
+    #[test]
+    fn every_file_backed_egg_has_content_in_both_locales() {
+        const ALL: &[Egg] = &[
+            Egg::Train,
+            Egg::Matrix,
+            Egg::SudoSu,
+            Egg::Nuke,
+            Egg::Whoami,
+            Egg::HackThePlanet,
+            Egg::Konami,
+            Egg::Sandwich,
+            Egg::SandwichSudo,
+            Egg::Answer42,
+            Egg::Xyzzy,
+            Egg::Cake,
+            Egg::VimEscape,
+            Egg::StarWars,
+        ];
+
+        for lang in [Language::PtBr, Language::EnUs] {
+            let i18n = I18n::new(lang);
+            for egg in ALL {
+                let name = egg.content_file().expect("egg de arquivo sem nome de arquivo");
+                let text = i18n
+                    .content(&format!("eggs/{}.txt", name))
+                    .unwrap_or_else(|| panic!("eggs/{}.txt ausente em {:?}", name, lang));
+                assert!(!text.trim().is_empty(), "eggs/{}.txt vazio em {:?}", name, lang);
+
+                // E o render de verdade também não pode sair vazio.
+                let rendered = EasterEggs::render(*egg, "", &i18n);
+                assert!(!rendered.trim().is_empty(), "{:?} renderizou vazio em {:?}", egg, lang);
+            }
+        }
+    }
+
+    /// Os eggs com texto próprio precisam realmente mudar de idioma; os que
+    /// citam obras em inglês continuam iguais de propósito.
+    #[test]
+    fn translated_eggs_differ_and_quotes_stay_the_same() {
+        let pt = I18n::new(Language::PtBr);
+        let en = I18n::new(Language::EnUs);
+
+        for egg in [Egg::Nuke, Egg::Whoami, Egg::Konami, Egg::Sandwich, Egg::VimEscape] {
+            assert_ne!(
+                EasterEggs::render(egg, "", &pt),
+                EasterEggs::render(egg, "", &en),
+                "{:?} deveria ter tradução própria",
+                egg
+            );
+        }
+
+        // Citações de Matrix / Portal / Hackers não se traduzem.
+        for egg in [Egg::Matrix, Egg::Cake, Egg::HackThePlanet] {
+            assert_eq!(
+                EasterEggs::render(egg, "", &pt),
+                EasterEggs::render(egg, "", &en),
+                "{:?} é citação em inglês e deve ser idêntica nos dois locales",
+                egg
+            );
+        }
+    }
+
+    /// O balão do cowsay tem que fechar certo mesmo com acento — a borda é
+    /// contada em caracteres, não em bytes.
+    #[test]
+    fn cowsay_border_matches_message_width_with_accents() {
+        let out = EasterEggs::cowsay("olá coração");
+        let border =
+            out.lines().find(|l| l.trim_start().starts_with('-')).expect("sem borda");
+        let speech = out.lines().find(|l| l.starts_with("< ")).expect("sem fala");
+
+        assert_eq!(
+            border.trim().chars().count(),
+            speech.chars().count() - 2,
+            "borda e balão desalinhados: {:?} vs {:?}",
+            border,
+            speech
+        );
+    }
+
+    #[test]
+    fn cowsay_without_message_uses_the_localized_default() {
+        let out = EasterEggs::check("cowsay", &i18n()).unwrap();
+        assert!(out.contains("cowsay <mensagem>"), "faltou a dica padrão: {}", out);
     }
 }

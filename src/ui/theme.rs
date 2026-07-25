@@ -29,6 +29,61 @@ pub fn load_color(pct: f32) -> Color {
     }
 }
 
+/// Estágio visual do terminal, derivado do nível.
+///
+/// Refina [`crate::game::tier::Tier`]: a **patente** marca a progressão
+/// narrativa (5 degraus) e o **estágio** marca a progressão visual (6), porque o
+/// nível 5 — onde o modo seguro se desliga — merece um visual próprio ainda
+/// dentro da patente Novato.
+///
+/// Fonte única dos cortes visuais. Antes as mesmas seis faixas estavam copiadas
+/// em `from_level`, `get_prompt_symbol`, `get_border_type` e
+/// `get_character_art`, e uma sétima cópia divergente vivia em
+/// `i18n::level_commands` (que cortava em 10 em vez de 9). O teste
+/// `stage_refines_tier` garante que estágio e patente nunca voltem a divergir.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Stage {
+    /// 1–4 — primeiros passos, modo seguro ligado.
+    Beginner,
+    /// 5–9 — modo seguro desligado.
+    Terminal,
+    /// 10–19
+    Hacker,
+    /// 20–29
+    Cyberpunk,
+    /// 30–39
+    Elite,
+    /// 40+
+    Legend,
+}
+
+impl Stage {
+    /// Estágio correspondente a um nível.
+    pub fn from_level(level: u32) -> Self {
+        match level {
+            0..=4 => Stage::Beginner,
+            5..=9 => Stage::Terminal,
+            10..=19 => Stage::Hacker,
+            20..=29 => Stage::Cyberpunk,
+            30..=39 => Stage::Elite,
+            _ => Stage::Legend,
+        }
+    }
+
+    /// Sufixo da chave Fluent da etiqueta na arte (`game-art-{}-tag`).
+    /// `None` no estágio inicial, que não exibe etiqueta.
+    fn art_tag(self) -> Option<&'static str> {
+        match self {
+            Stage::Beginner => None,
+            Stage::Terminal => Some("terminal"),
+            Stage::Hacker => Some("hacker"),
+            Stage::Cyberpunk => Some("cyberpunk"),
+            Stage::Elite => Some("elite"),
+            Stage::Legend => Some("legend"),
+        }
+    }
+}
+
 /// Tema visual progressivo baseado no nível
 #[derive(Debug, Clone, Copy)]
 pub struct Theme {
@@ -46,9 +101,9 @@ pub struct Theme {
 impl Theme {
     /// Retorna o tema baseado no nível do jogador
     pub fn from_level(level: u32) -> Self {
-        match level {
-            // Níveis 1-4: Tema Iniciante (Azul claro e branco)
-            1..=4 => Self {
+        match Stage::from_level(level) {
+            // Tema Iniciante (Azul claro e branco)
+            Stage::Beginner => Self {
                 primary: Color::Cyan,
                 secondary: Color::Blue,
                 accent: Color::LightBlue,
@@ -60,8 +115,8 @@ impl Theme {
                 text: Color::White,
             },
             
-            // Níveis 5-9: Tema Terminal (Verde Matrix)
-            5..=9 => Self {
+            // Tema Terminal (Verde Matrix)
+            Stage::Terminal => Self {
                 primary: Color::Green,
                 secondary: Color::Rgb(0, 200, 0),
                 accent: Color::Rgb(0, 255, 100),
@@ -73,8 +128,8 @@ impl Theme {
                 text: Color::Rgb(0, 255, 0),
             },
             
-            // Níveis 10-19: Tema Hacker (Verde escuro e ciano)
-            10..=19 => Self {
+            // Tema Hacker (Verde escuro e ciano)
+            Stage::Hacker => Self {
                 primary: Color::Rgb(0, 255, 128),
                 secondary: Color::Rgb(0, 200, 100),
                 accent: Color::Cyan,
@@ -86,8 +141,8 @@ impl Theme {
                 text: Color::Rgb(200, 255, 200),
             },
             
-            // Níveis 20-29: Tema Cyberpunk (Magenta e ciano)
-            20..=29 => Self {
+            // Tema Cyberpunk (Magenta e ciano)
+            Stage::Cyberpunk => Self {
                 primary: Color::Magenta,
                 secondary: Color::Cyan,
                 accent: Color::Rgb(255, 0, 255),
@@ -99,8 +154,8 @@ impl Theme {
                 text: Color::Rgb(255, 128, 255),
             },
             
-            // Níveis 30-39: Tema Elite (Roxo e vermelho) — alinhado à patente Elite
-            30..=39 => Self {
+            // Tema Elite (Roxo e vermelho) — alinhado à patente Elite
+            Stage::Elite => Self {
                 primary: Color::Rgb(128, 0, 255),
                 secondary: Color::Rgb(255, 0, 128),
                 accent: Color::Rgb(200, 0, 255),
@@ -112,8 +167,8 @@ impl Theme {
                 text: Color::Rgb(200, 100, 255),
             },
             
-            // Níveis 50+: Tema Legend (Arco-íris escuro)
-            _ => Self {
+            // Tema Legend (Arco-íris escuro) — a partir do nível 40
+            Stage::Legend => Self {
                 primary: Color::Rgb(255, 0, 255),
                 secondary: Color::Rgb(0, 255, 255),
                 accent: Color::Rgb(255, 255, 0),
@@ -139,34 +194,40 @@ impl Theme {
     
     /// Retorna símbolo especial baseado no nível
     pub fn get_prompt_symbol(level: u32) -> &'static str {
-        match level {
-            1..=4 => "➜",
-            5..=9 => "►",
-            10..=19 => "▶",
-            20..=29 => "◆",
-            30..=39 => "⬢",
-            _ => "⬣",
+        match Stage::from_level(level) {
+            Stage::Beginner => "➜",
+            Stage::Terminal => "►",
+            Stage::Hacker => "▶",
+            Stage::Cyberpunk => "◆",
+            Stage::Elite => "⬢",
+            Stage::Legend => "⬣",
         }
     }
     
-    /// Retorna estilo da borda baseado no nível
+    /// Retorna estilo da borda baseado no nível.
+    ///
+    /// O `ratatui` só oferece quatro tipos de borda, então os três estágios mais
+    /// altos compartilham `Thick` — agora de forma explícita, e não como três
+    /// ramos separados que por acaso devolviam o mesmo valor.
     pub fn get_border_type(level: u32) -> ratatui::widgets::BorderType {
         use ratatui::widgets::BorderType;
-        match level {
-            1..=4 => BorderType::Plain,
-            5..=9 => BorderType::Rounded,
-            10..=19 => BorderType::Thick,
-            20..=29 => BorderType::Double,
-            30..=39 => BorderType::Thick, // Repetido pois não temos muitos tipos padrão
-            _ => BorderType::Thick,
+        match Stage::from_level(level) {
+            Stage::Beginner => BorderType::Plain,
+            Stage::Terminal => BorderType::Rounded,
+            Stage::Cyberpunk => BorderType::Double,
+            Stage::Hacker | Stage::Elite | Stage::Legend => BorderType::Thick,
         }
     }
     
     /// Retorna ASCII art do personagem baseado no nível
     pub fn get_character_art(level: u32, i18n: &crate::i18n::I18n) -> Vec<String> {
-        match level {
-            // 1-4: Tux Iniciante
-            1..=4 => vec![
+        let stage = Stage::from_level(level);
+        // A etiqueta ao lado da arte vem do próprio estágio (fonte única).
+        let tag = stage.art_tag().map(|m| i18n.art_tag(m)).unwrap_or_default();
+
+        match stage {
+            // Tux Iniciante
+            Stage::Beginner => vec![
                 "       .--.".to_string(),
                 "      |o_o |".to_string(),
                 "      |:_/ |".to_string(),
@@ -176,10 +237,10 @@ impl Theme {
                 "   \\___)=(___/".to_string(),
             ],
             
-            // 5-9: Tux com Terminal
-            5..=9 => vec![
+            // Tux com Terminal
+            Stage::Terminal => vec![
                 "       .--.".to_string(),
-                format!("      |>_< |  {}", i18n.art_tag("terminal")),
+                format!("      |>_< |  {}", tag),
                 "      |:_/ |".to_string(),
                 "     //   \\ \\".to_string(),
                 "    (|  █  | )".to_string(),
@@ -187,10 +248,10 @@ impl Theme {
                 "   \\___)=(___/".to_string(),
             ],
             
-            // 10-19: Tux Hacker
-            10..=19 => vec![
+            // Tux Hacker
+            Stage::Hacker => vec![
                 "       .--.".to_string(),
-                format!("      |◉_◉ |  {}", i18n.art_tag("hacker")),
+                format!("      |◉_◉ |  {}", tag),
                 "      |:_/ |".to_string(),
                 "     //▓▓▓\\ \\".to_string(),
                 "    (|  █  | )".to_string(),
@@ -198,10 +259,10 @@ impl Theme {
                 "   \\___)=(___/".to_string(),
             ],
             
-            // 20-29: Tux Cyberpunk
-            20..=29 => vec![
+            // Tux Cyberpunk
+            Stage::Cyberpunk => vec![
                 "    ▀▄▀▄.--.".to_string(),
-                format!("    ▄▀▄|◉‿◉|  {}", i18n.art_tag("cyberpunk")),
+                format!("    ▄▀▄|◉‿◉|  {}", tag),
                 "      |:≈/ |".to_string(),
                 "     //▓▓▓\\ \\".to_string(),
                 "    (| ▓█▓ | )".to_string(),
@@ -209,10 +270,10 @@ impl Theme {
                 "   \\___)≡(___/".to_string(),
             ],
             
-            // 30-39: Tux Elite (alinhado à patente Elite)
-            30..=39 => vec![
+            // Tux Elite (alinhado à patente Elite)
+            Stage::Elite => vec![
                 "  ▓▓▀▄▀▄.--.".to_string(),
-                format!("  ▓▓▄▀▄|◉‿◉|  {}", i18n.art_tag("elite")),
+                format!("  ▓▓▄▀▄|◉‿◉|  {}", tag),
                 "  ▓▓  |:≈/ |".to_string(),
                 "     //▓█▓\\ \\".to_string(),
                 "    (| ▓█▓ | )▓".to_string(),
@@ -220,10 +281,10 @@ impl Theme {
                 "   \\___)≡(___/".to_string(),
             ],
             
-            // 50+: Tux Legend
-            _ => vec![
+            // Tux Legend — a partir do nível 40
+            Stage::Legend => vec![
                 "  ▓▓▓▀▄▀▄.--.".to_string(),
-                format!("  ▓▓▓▄▀▄|★‿★|  {}", i18n.art_tag("legend")),
+                format!("  ▓▓▓▄▀▄|★‿★|  {}", tag),
                 "  ▓▓▓  |:≈/ |".to_string(),
                 "  ▓  //▓█▓\\ \\  ▓".to_string(),
                 "    (| ███ | )▓▓".to_string(),

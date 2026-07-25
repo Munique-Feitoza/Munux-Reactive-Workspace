@@ -1,0 +1,35 @@
+╔═══════════════════════════════════════════════════════════╗
+║           MANJARO/ARCH LINUX GUIDE - PACMAN               ║
+╚═══════════════════════════════════════════════════════════╝
+
+📦 PACKAGE MANAGEMENT (PACMAN)
+────────────────────────────────────────────────────────────
+  sudo pacman -S <package>      # Install a package
+  sudo pacman -R <package>      # Remove a package
+  sudo pacman -Rs <package>     # Remove + dependencies
+  sudo pacman -Syu              # Full system upgrade
+  sudo pacman -Ss <name>        # Search for a package
+  sudo pacman -Qi <package>     # Info on an installed package
+  sudo pacman -Sc               # Clean the cache
+
+📦 AUR HELPER (YAY/PARU)
+────────────────────────────────────────────────────────────
+  yay <package>                 # Search and install (AUR)
+  yay -S <package>              # Install from the AUR
+  yay -Syu                      # Upgrade everything (official + AUR)
+  yay -Ps                       # System statistics
+  paru <package>                # Alternative to yay
+
+🔧 PAMAC (GUI/CLI)
+────────────────────────────────────────────────────────────
+  pamac install <package>       # Install
+  pamac remove <package>        # Remove
+  pamac update                  # Update
+  pamac search <name>           # Search
+
+💡 MANJARO TIPS
+────────────────────────────────────────────────────────────
+  • Always run 'sudo pacman -Syu' before installing anything
+  • The AUR is not official — use it with care
+  • base-devel is required to build from the AUR
+  • Kernel Manager: sudo mhwd-kernel -li

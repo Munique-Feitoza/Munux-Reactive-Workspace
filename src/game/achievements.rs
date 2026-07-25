@@ -153,7 +153,7 @@ impl AchievementChecker {
             xp_reward,
         };
         
-        game_state.achievements.push(achievement.clone());
+        game_state.push_achievement(achievement.clone());
         Some(achievement)
     }
 }

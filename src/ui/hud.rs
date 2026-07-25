@@ -6,7 +6,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Gauge, Paragraph},
     Frame,
 };
 
@@ -16,10 +16,7 @@ pub fn render_hud(frame: &mut Frame, app: &App, area: Rect) {
     
     let theme = app.game_state.get_theme();
     
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme.border))
-        .style(Style::default().bg(Color::Black));
+    let block = crate::ui::panel_block(String::new(), theme.border);
     
     let inner = block.inner(area);
     frame.render_widget(block, area);

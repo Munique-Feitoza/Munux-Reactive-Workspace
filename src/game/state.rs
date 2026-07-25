@@ -1,8 +1,10 @@
 // Author: Munique Alves Pacheco Feitoza
 // License: GPLv3
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::cell::OnceCell;
+use std::collections::HashSet;
 
 /// Estado de gamificação do usuário
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +53,11 @@ pub struct GameState {
     
     /// Comandos que falharam
     pub failed_commands: u32,
+
+    /// Índice `id -> presente` das conquistas, para consulta O(1).
+    /// Derivado de `achievements`, então não é serializado nem comparado.
+    #[serde(skip)]
+    achievement_ids: OnceCell<HashSet<String>>,
 }
 
 /// Conquista desbloqueada
@@ -82,20 +89,30 @@ impl GameState {
             active_quests: crate::game::quests::generate_quests_for_level(1, i18n),
             successful_commands: 0,
             failed_commands: 0,
+            achievement_ids: OnceCell::new(),
         }
     }
     
-    /// Adiciona XP e verifica level up
+    /// Adiciona XP e sobe **todos** os níveis alcançados, devolvendo `true` se
+    /// houve pelo menos um level up.
+    ///
+    /// Antes o `if` subia um único nível por chamada: uma concessão grande
+    /// (o easter egg `rm -rf /` dá 666 XP; o cheat `xp` de debug, qualquer valor)
+    /// deixava o XP muito acima do limiar e a pessoa destravava um nível por
+    /// comando até drenar a sobra. Com `add_xp(10_000)` no nível 1 o estado
+    /// ficava em `level=2, xp=9900, limiar=120`.
     pub fn add_xp(&mut self, amount: u32) -> bool {
-        self.xp += amount;
-        
-        // Verifica se subiu de nível
-        if self.xp >= self.xp_to_next_level {
+        self.xp = self.xp.saturating_add(amount);
+
+        let mut leveled = false;
+        // `level_up` sempre desconta `xp_to_next_level` (> 0) e depois o
+        // multiplica por 1.2, então `xp` cai a cada volta e o laço termina.
+        while self.xp >= self.xp_to_next_level && self.xp_to_next_level > 0 {
             self.level_up();
-            return true;
+            leveled = true;
         }
-        
-        false
+
+        leveled
     }
     
     /// Sobe de nível
@@ -144,9 +161,24 @@ impl GameState {
         self.total_commands += 1;
     }
     
-    /// Verifica se tem uma conquista específica
+    /// Verifica se tem uma conquista específica. O(1) amortizado.
+    ///
+    /// O `Vec<Achievement>` é a forma serializada (ordem = ordem de desbloqueio,
+    /// que a UI usa para "conquistas recentes"); o `HashSet` de ids é o índice
+    /// de consulta, reconstruído sob demanda. Cada comando dispara até 15
+    /// verificações, e antes cada uma varria o vetor inteiro.
     pub fn has_achievement(&self, id: &str) -> bool {
-        self.achievements.iter().any(|a| a.id == id)
+        self.achievement_ids
+            .get_or_init(|| self.achievements.iter().map(|a| a.id.clone()).collect())
+            .contains(id)
+    }
+
+    /// Registra uma conquista desbloqueada, mantendo o índice coerente.
+    /// Único ponto que faz `push` em `achievements`.
+    pub fn push_achievement(&mut self, achievement: Achievement) {
+        self.achievements.push(achievement);
+        // Invalida o índice: será remontado na próxima consulta.
+        self.achievement_ids.take();
     }
     
     /// Registra comando bem-sucedido
@@ -229,6 +261,25 @@ mod tests {
     }
 
     #[test]
+    fn add_xp_climbs_every_level_the_grant_covers() {
+        let mut s = state();
+        // 100 + 120 + 144 = 364 XP cobrem exatamente 3 níveis (1 -> 4).
+        assert!(s.add_xp(364));
+        assert_eq!(s.level, 4);
+        assert_eq!(s.xp, 0);
+
+        // Uma concessão enorme não pode deixar XP parado acima do limiar.
+        let mut s = state();
+        s.add_xp(10_000);
+        assert!(
+            s.xp < s.xp_to_next_level,
+            "sobrou XP acima do limiar: xp={} limiar={}",
+            s.xp,
+            s.xp_to_next_level
+        );
+    }
+
+    #[test]
     fn add_xp_below_threshold_does_not_level() {
         let mut s = state();
         assert!(!s.add_xp(50));
@@ -264,6 +315,47 @@ mod tests {
         assert_eq!(s.failed_commands, 1);
 
         assert!((s.success_rate() - 66.666).abs() < 0.1); // 2/3
+    }
+
+    /// O índice O(1) é um cache derivado; se ele não for invalidado a cada
+    /// desbloqueio, uma conquista nova ficaria invisível para `has_achievement`
+    /// e poderia ser concedida duas vezes.
+    #[test]
+    fn achievement_index_stays_in_sync_with_the_vector() {
+        let mut s = state();
+        assert!(!s.has_achievement("first_ls")); // consulta -> índice materializa
+
+        s.push_achievement(Achievement {
+            id: "first_ls".into(),
+            name: "Olho do Tigre".into(),
+            description: "Use 'ls'".into(),
+            unlocked_at: Utc::now(),
+            xp_reward: 15,
+        });
+
+        assert!(s.has_achievement("first_ls"), "índice ficou obsoleto após o push");
+        assert!(!s.has_achievement("first_cd"));
+        assert_eq!(s.achievements.len(), 1);
+    }
+
+    /// O índice não é serializado: precisa ser reconstruído a partir do vetor
+    /// ao carregar um save.
+    #[test]
+    fn achievement_index_rebuilds_after_deserialization() {
+        let mut s = state();
+        s.push_achievement(Achievement {
+            id: "first_git".into(),
+            name: "n".into(),
+            description: "d".into(),
+            unlocked_at: Utc::now(),
+            xp_reward: 35,
+        });
+
+        let json = serde_json::to_string(&s).unwrap();
+        let restored: GameState = serde_json::from_str(&json).unwrap();
+
+        assert!(restored.has_achievement("first_git"));
+        assert!(!restored.has_achievement("first_ls"));
     }
 
     #[test]

@@ -1,6 +1,7 @@
 // Author: Munique Alves Pacheco Feitoza
 // License: GPLv3
 
+pub mod rng;
 pub mod state;
 pub mod tier;
 pub mod logic;

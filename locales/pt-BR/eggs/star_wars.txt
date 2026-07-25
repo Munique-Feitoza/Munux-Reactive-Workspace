@@ -1,0 +1,14 @@
+        ✦        .          ✦
+   .          ___________          .
+        ____  /          /\
+   ✦   /   /\/          /  \    .
+      /   /  \         /    \        ✦
+     /___/    \_______/______\
+     \   \    /       \      /
+   .  \   \  /         \    /   ✦
+       \___\/___________\__/
+              STAR WARS
+
+May the Force be with you.
+
+(Dica nerd: telnet towel.blinkenlights.nl roda o Episódio IV inteiro em ASCII.)

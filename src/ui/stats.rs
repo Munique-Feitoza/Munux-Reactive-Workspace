@@ -16,10 +16,10 @@ pub fn render_stats_panel(frame: &mut Frame, app: &App, area: Rect) {
     
     let theme = app.game_state.get_theme();
     
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" 📊 {} - {} ", app.i18n.tc("ui-stats"), app.game_state.get_rank(&app.i18n)))
-        .border_style(Style::default().fg(theme.border));
+    let block = crate::ui::panel_block_bare(
+        format!(" 📊 {} - {} ", app.i18n.tc("ui-stats"), app.game_state.get_rank(&app.i18n)),
+        theme.border,
+    );
     
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -203,10 +203,10 @@ fn render_recent_achievements(frame: &mut Frame, game_state: &GameState, i18n: &
 pub fn render_quests_panel(frame: &mut Frame, app: &App, area: Rect) {
     let theme = app.game_state.get_theme();
     
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" 📋 {} ", app.i18n.tc("ui-active-quests")))
-        .border_style(Style::default().fg(theme.border));
+    let block = crate::ui::panel_block_bare(
+        format!(" 📋 {} ", app.i18n.tc("ui-active-quests")),
+        theme.border,
+    );
     
     let inner = block.inner(area);
     frame.render_widget(block, area);

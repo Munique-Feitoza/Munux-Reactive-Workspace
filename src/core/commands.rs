@@ -11,6 +11,8 @@
 //! `rm` NÃO está na tabela: depende das flags (ver `parser::classify_command`).
 
 use crate::core::parser::CommandType;
+use std::collections::HashMap;
+use std::sync::OnceLock;
 
 /// (nome do comando, tipo). Ordem irrelevante; busca é por igualdade exata.
 pub const COMMANDS: &[(&str, CommandType)] = &[
@@ -163,15 +165,78 @@ pub const COMMANDS: &[(&str, CommandType)] = &[
     ("konami", CommandType::EasterEgg),
 ];
 
-/// Tipo do comando base (primeira palavra), se conhecido na tabela.
+/// Índice `nome -> tipo`, construído uma única vez na primeira consulta.
+///
+/// `classify_command` roda no caminho quente (2× por tecla digitada no
+/// `analyze_input` e 1× por frame no `colorize_input`); a varredura linear sobre
+/// a tabela custava O(n) com n = 133. O índice deixa a consulta em O(1).
+fn index() -> &'static HashMap<&'static str, CommandType> {
+    static INDEX: OnceLock<HashMap<&'static str, CommandType>> = OnceLock::new();
+    INDEX.get_or_init(|| COMMANDS.iter().map(|(name, ty)| (*name, ty.clone())).collect())
+}
+
+/// Tipo do comando base (primeira palavra), se conhecido na tabela. O(1).
 pub fn command_type(first_word: &str) -> Option<CommandType> {
-    COMMANDS
-        .iter()
-        .find(|(name, _)| *name == first_word)
-        .map(|(_, ty)| ty.clone())
+    index().get(first_word).cloned()
 }
 
 /// Nomes de todos os comandos conhecidos (para autocomplete/builtins).
 pub fn names() -> impl Iterator<Item = &'static str> {
     COMMANDS.iter().map(|(name, _)| *name)
+}
+
+/// Comandos que pedem uma listagem do diretório. Fonte única: antes esta lista
+/// vivia solta em `app.rs` e era casada com `starts_with`, de modo que `lsof` e
+/// `last` eram tratados como listagem.
+const LISTING: &[&str] = &["ls", "ll", "la"];
+
+/// `true` se a **palavra exata** é um comando de listagem de diretório.
+pub fn is_listing(first_word: &str) -> bool {
+    LISTING.contains(&first_word)
+}
+
+/// `true` se o comando cria, remove, copia ou move arquivos — ou seja, se a
+/// árvore do diretório atual muda visivelmente. Deriva do catálogo em vez de uma
+/// lista paralela de prefixos (`mkdir|touch|rm |mv |cp `).
+pub fn mutates_files(first_word: &str) -> bool {
+    matches!(command_type(first_word), Some(CommandType::FileOperation))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn index_covers_every_table_entry() {
+        for (name, ty) in COMMANDS {
+            assert_eq!(command_type(name).as_ref(), Some(ty), "'{}' ausente no índice", name);
+        }
+        assert_eq!(index().len(), COMMANDS.len(), "há nomes duplicados na tabela COMMANDS");
+    }
+
+    #[test]
+    fn unknown_command_has_no_type() {
+        assert!(command_type("zzzznotacommand").is_none());
+        assert_eq!(command_type("git"), Some(CommandType::VersionControl));
+    }
+
+    #[test]
+    fn listing_matches_whole_word_only() {
+        assert!(is_listing("ls"));
+        assert!(is_listing("ll"));
+        // O bug do `starts_with`: estes começam com "ls"/"la" mas não listam nada.
+        assert!(!is_listing("lsof"));
+        assert!(!is_listing("last"));
+        assert!(!is_listing("lsblk"));
+    }
+
+    #[test]
+    fn mutating_commands_come_from_the_catalog() {
+        for c in ["mkdir", "touch", "cp", "mv", "rm", "rmdir", "ln"] {
+            assert!(mutates_files(c), "'{}' deveria alterar arquivos", c);
+        }
+        for c in ["ls", "cd", "grep", "git", "stats"] {
+            assert!(!mutates_files(c), "'{}' não altera arquivos", c);
+        }
+    }
 }

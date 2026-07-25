@@ -81,6 +81,7 @@ fn render_file_tree(frame: &mut Frame, _path: &std::path::Path, app: &App, area:
     use crate::core::filesystem::FileSystemManager;
 
     let browsing = app.is_browsing_files();
+    let entries = app.dir_entries();
     let mut block =
         crate::ui::panel_block(format!(" 📂 {} ", app.i18n.navigation_title()), Color::Cyan);
     if browsing {
@@ -96,9 +97,10 @@ fn render_file_tree(frame: &mut Frame, _path: &std::path::Path, app: &App, area:
         Span::raw(".."),
     ])));
 
-    // Lista compartilhada com a navegação (mesma ordem e limite).
-    let entries = app.dir_entries();
-    if entries.is_empty() && FileSystemManager::list_directory(&app.current_dir).is_err() {
+    // Lista compartilhada com a navegação (mesma ordem e limite), vinda do cache
+    // do `App` — o render não abre o diretório. O estado de erro também vem de
+    // lá, no lugar de um segundo `read_dir` só para distinguir vazio de ilegível.
+    if app.dir_unreadable() {
         items.push(ListItem::new(Line::from(vec![
             Span::styled("⚠ ", Style::default().fg(Color::Red)),
             Span::raw(app.i18n.tc("ui-err-read-dir")),
@@ -147,9 +149,8 @@ fn render_file_preview(
     app: &App,
     area: Rect,
 ) {
-    let filename = path.file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("arquivo");
+    let unnamed = app.i18n.tc("ui-unnamed-file");
+    let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or(&unnamed);
 
     // Preview com realce de sintaxe para linguagens suportadas.
     if !content.is_empty() && crate::ui::highlight::is_supported(language) {
@@ -184,7 +185,7 @@ fn render_file_preview(
         // diretório lógico correto) e chegam prontas em `content`. Aqui é só um
         // fallback simples — sem varrer o diretório do processo (que após `cd`
         // estaria errado).
-        format!("❌ Arquivo '{}' não encontrado", filename)
+        app.i18n.t1("sys-file-not-found", "name", filename)
     } else if let Ok(file_content) = fs::read_to_string(path) {
         let lines: Vec<&str> = file_content.lines().take(30).collect();
         if lines.is_empty() {
@@ -262,7 +263,8 @@ fn render_resource_monitor(
             Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
         )),
     ];
-    for p in app.system_summary.top_processes.iter().take(5) {
+    // O monitor já entrega no máximo `TOP_PROCESSES`; nada a cortar aqui.
+    for p in &app.system_summary.top_processes {
         let name: String = p.name.chars().take(14).collect();
         info_lines.push(Line::from(vec![
             Span::styled(format!("{:>7} ", p.pid), Style::default().fg(Color::DarkGray)),
@@ -408,7 +410,7 @@ fn render_danger_zone(
         Line::from(""),
         Line::from(vec![
             Span::styled(
-                "   💡 DICA: ",
+                format!("   {} ", app.i18n.tc("ui-danger-tip-label")),
                 Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             ),
             Span::styled(
@@ -606,10 +608,10 @@ fn render_command_help(
     i18n: &crate::i18n::I18n,
     area: Rect,
 ) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" Comando: {} ", command))
-        .border_style(Style::default().fg(Color::Green));
+    let block = crate::ui::panel_block_bare(
+        format!(" {} ", i18n.t1("ui-command-help-title", "command", command)),
+        Color::Green,
+    );
     
     let mut lines = vec![
         Line::from(""),
@@ -650,10 +652,10 @@ fn render_command_help(
 
 /// Renderiza easter egg
 fn render_easter_egg(frame: &mut Frame, content: &str, app: &App, area: Rect) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" 🥚 {} ", app.i18n.tc("ui-easter-egg")))
-        .border_style(Style::default().fg(Color::Magenta));
+    let block = crate::ui::panel_block_bare(
+        format!(" 🥚 {} ", app.i18n.tc("ui-easter-egg")),
+        Color::Magenta,
+    );
     
     let paragraph = Paragraph::new(content)
         .block(block)
@@ -665,10 +667,7 @@ fn render_easter_egg(frame: &mut Frame, content: &str, app: &App, area: Rect) {
 
 /// Renderiza painel de ajuda (help)
 fn render_help_panel(frame: &mut Frame, content: &str, title: &str, app: &App, area: Rect) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" 📚 {} ", title))
-        .border_style(Style::default().fg(Color::Cyan))
+    let block = crate::ui::panel_block_bare(format!(" 📚 {} ", title), Color::Cyan)
         .title_bottom(format!(" {}  ·  {} ", app.i18n.esc_to_back(), app.i18n.scroll_hint()));
 
     let paragraph = Paragraph::new(content)

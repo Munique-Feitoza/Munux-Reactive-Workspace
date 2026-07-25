@@ -1,6 +1,7 @@
 // Author: Munique Alves Pacheco Feitoza
 // License: GPLv3
 
+use crate::ui::theme::Stage;
 use std::collections::HashMap;
 use fluent::{FluentBundle, FluentResource, FluentArgs};
 use include_dir::{include_dir, Dir};
@@ -99,6 +100,34 @@ impl I18n {
         self.t(key, None)
     }
 
+    /// Traduz `key` com um único argumento string. Casos multi-argumento montam
+    /// o `FluentArgs` na mão.
+    pub fn t1(&self, key: &str, name: &'static str, value: impl Into<String>) -> String {
+        let mut args = FluentArgs::new();
+        args.set(name, value.into());
+        self.t(key, Some(&args))
+    }
+
+    /// Carrega um **bloco de conteúdo** do locale atual, com fallback para
+    /// en-US. `relative` é o caminho dentro do diretório do idioma
+    /// (ex.: `"guides/arch.txt"`).
+    ///
+    /// Textos longos e formatados — guias de distro, arte ASCII dos easter eggs
+    /// — não cabem bem no Fluent: valores multilinha exigem indentação de
+    /// continuação, quebram com linhas em branco no meio e obrigariam a escapar
+    /// as chaves `{}` que aparecem em exemplos de código. Ficam em arquivos
+    /// `.txt` por idioma, embutidos no binário pelo mesmo `include_dir!`.
+    ///
+    /// Devolve `&'static str` porque o conteúdo é compilado junto ao binário.
+    pub fn content(&self, relative: &str) -> Option<&'static str> {
+        let read = |lang: Language| {
+            LOCALES_DIR
+                .get_file(format!("{}/{}", lang.as_str(), relative))
+                .and_then(|file| file.contents_utf8())
+        };
+        read(self.lang).or_else(|| read(Language::EnUs))
+    }
+
     /// Traduz `key` retornando `None` quando a chave não existe (em vez do
     /// sentinela `[MISSING: ...]`). Fonte única do teste de "chave ausente".
     pub fn try_t(&self, key: &str) -> Option<String> {
@@ -151,23 +180,29 @@ impl I18n {
             .unwrap_or_else(|| format!("[{}]", mode.to_uppercase()))
     }
 
+    /// Comandos sugeridos na tela inicial, conforme o estágio do jogador.
+    ///
+    /// As faixas vêm da fonte única [`Stage`]. Antes esta tabela cortava em 10
+    /// enquanto todas as outras cortavam em 9: quem estava no nível 10 já era
+    /// Aprendiz e já via o tema Hacker, mas continuava recebendo as sugestões
+    /// do bloco iniciante.
     pub fn level_commands(&self, level: u32) -> Vec<(&'static str, String)> {
-        match level {
-            1..=4 => vec![
-                ("ls", self.t("hint-ls", None)),
-                ("pwd", self.t("hint-pwd", None)),
-                ("mkdir [nome]", self.t("hint-mkdir", None)),
+        match Stage::from_level(level) {
+            Stage::Beginner => vec![
+                ("ls", self.tc("hint-ls")),
+                ("pwd", self.tc("hint-pwd")),
+                ("mkdir [nome]", self.tc("hint-mkdir")),
             ],
-            5..=10 => vec![
-                ("cat [arquivo]", self.t("hint-cat", None)),
-                ("rm [arquivo]", self.t("hint-rm", None)),
-                ("cp [orig] [dest]", self.t("hint-cp", None)),
-                ("mv [orig] [dest]", self.t("hint-mv", None)),
+            Stage::Terminal => vec![
+                ("cat [arquivo]", self.tc("hint-cat")),
+                ("rm [arquivo]", self.tc("hint-rm")),
+                ("cp [orig] [dest]", self.tc("hint-cp")),
+                ("mv [orig] [dest]", self.tc("hint-mv")),
             ],
             _ => vec![
-                ("ssh [user]@[host]", self.t("hint-ssh", None)),
-                ("ps aux | grep ...", self.t("hint-grep", None)),
-                ("systemctl status ...", self.t("hint-systemctl", None)),
+                ("ssh [user]@[host]", self.tc("hint-ssh")),
+                ("ps aux | grep ...", self.tc("hint-grep")),
+                ("systemctl status ...", self.tc("hint-systemctl")),
             ],
         }
     }
@@ -239,7 +274,52 @@ mod tests {
         // diversos
         "ui-top-processes", "ui-browse-hint", "ui-back-to-normal",
         "sys-file-not-found", "sys-files-found",
+        // v0.3.1 — strings que estavam fixas em português no código
+        "sys-output-truncated", "ui-command-help-title", "ui-unnamed-file",
+        "ui-danger-tip-label", "ui-popup-close", "ui-file-too-large",
+        "sys-ssh-hostkey-mismatch", "sys-ssh-hostkey-unverifiable",
+        "sys-ssh-err-connect", "sys-ssh-err-handshake", "sys-ssh-err-auth", "sys-ssh-err-nodir",
+        "tutorial-header", "tutorial-hint", "tutorial-exit-note",
+        "egg-cowsay-default",
+        "guide-arch-title", "guide-debian-title", "guide-fedora-title",
+        "guide-opensuse-title", "guide-general-title",
     ];
+
+    /// Os dois locales precisam declarar exatamente o mesmo conjunto de chaves.
+    ///
+    /// A lista `REQUIRED_KEYS` protege as chaves que alguém lembrou de
+    /// cadastrar; esta guarda é estrutural e pega o caso geral — uma chave nova
+    /// adicionada só no pt-BR cairia calada no fallback em inglês (ou vice-versa).
+    #[test]
+    fn both_locales_declare_the_same_keys() {
+        fn keys_of(lang: &str) -> std::collections::BTreeSet<String> {
+            let file = LOCALES_DIR
+                .get_file(format!("{lang}/main.ftl"))
+                .unwrap_or_else(|| panic!("locale {lang} ausente"));
+            file.contents_utf8()
+                .expect("FTL não é UTF-8")
+                .lines()
+                .filter_map(|line| {
+                    // Uma mensagem Fluent é `chave = valor` na coluna 0.
+                    let line = line.trim_end();
+                    if line.starts_with([' ', '\t', '#']) || line.is_empty() {
+                        return None;
+                    }
+                    line.split_once('=').map(|(k, _)| k.trim().to_string())
+                })
+                .collect()
+        }
+
+        let pt = keys_of("pt-BR");
+        let en = keys_of("en-US");
+
+        let only_pt: Vec<_> = pt.difference(&en).collect();
+        let only_en: Vec<_> = en.difference(&pt).collect();
+
+        assert!(only_pt.is_empty(), "chaves só em pt-BR: {:?}", only_pt);
+        assert!(only_en.is_empty(), "chaves só em en-US: {:?}", only_en);
+        assert!(pt.len() > 200, "parse suspeito: só {} chaves encontradas", pt.len());
+    }
 
     #[test]
     fn all_required_keys_resolve_in_both_locales() {

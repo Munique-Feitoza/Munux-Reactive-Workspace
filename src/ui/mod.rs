@@ -29,6 +29,20 @@ pub fn panel_block(
         .style(Style::default().bg(ratatui::style::Color::Black))
 }
 
+/// Variante sem fundo próprio, para painéis que herdam o fundo do tema global.
+/// Mesma borda e mesmo título de [`panel_block`] — só sem o `bg` preto fixo.
+pub fn panel_block_bare(
+    title: String,
+    border: ratatui::style::Color,
+) -> ratatui::widgets::Block<'static> {
+    use ratatui::style::Style;
+    use ratatui::widgets::{Block, Borders};
+    Block::default()
+        .borders(Borders::ALL)
+        .title(title)
+        .border_style(Style::default().fg(border))
+}
+
 /// Renderiza toda a interface do usuário
 pub fn render(frame: &mut Frame, app: &App) {
     // Renderiza background global
